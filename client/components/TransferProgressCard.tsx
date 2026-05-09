@@ -28,6 +28,7 @@ export function TransferProgressCard({ progresses }: Props) {
     return null;
   }
 
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
 
   return (

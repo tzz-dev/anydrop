@@ -29,9 +29,12 @@ export function useSignaling(
 
   // Keep onMessage fresh without including it in effect deps
   const onMessageRef = useRef(onMessage);
-  onMessageRef.current = onMessage;
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  });
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setConnected(false);
     if (!room) return;
 
@@ -54,7 +57,6 @@ export function useSignaling(
       signaling.disconnect();
       signalingRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room, mode, passwordHash, create, exclusive]);
 
   return { connected, signalingRef };

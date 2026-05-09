@@ -54,7 +54,7 @@ export default function Home() {
       .then((r) => r.json())
       .then(({ lanRoom }: { lanRoom: string }) => setAutoRoom(lanRoom))
       .catch(() => toast.error(t('errorSignalingUnreachable')));
-  }, [setMode]);
+  }, [setMode, t]);
 
   const connectionRoom = mode === 'lan' ? autoRoom : (pendingRoom ?? privateRoom);
 
