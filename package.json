@@ -2,6 +2,7 @@
   "name": "anydrop",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@10.26.1",
   "scripts": {
     "dev": "concurrently -n server,client -c blue,green \"pnpm dev:server\" \"pnpm dev:client\"",
     "dev:server": "pnpm --filter anydrop-server dev",
