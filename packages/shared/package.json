@@ -1,0 +1,13 @@
+{
+  "name": "anydrop-shared",
+  "version": "1.0.0",
+  "private": true,
+  "types": "./src/types.ts",
+  "exports": {
+    ".": {
+      "types": "./src/types.ts",
+      "import": "./src/types.ts",
+      "require": "./src/types.ts"
+    }
+  }
+}
