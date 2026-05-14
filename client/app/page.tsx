@@ -379,7 +379,6 @@ export default function Home() {
                 className={inputClass}
               />
               <Button
-                variant="outline"
                 className="w-full"
                 onClick={() => { if (joinInput.trim()) joinPrivateRoom(joinInput.trim(), passwordInput, false); }}
                 disabled={!joinInput.trim()}
