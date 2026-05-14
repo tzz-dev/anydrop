@@ -12,6 +12,7 @@
   "dropToSend": "ドロップして送信",
   "toastReceived": "受信完了：{name} ({size})",
   "toastSending": "送信中：{name}",
+  "create": "作成",
   "createPrivateRoom": "プライベートルームを作成",
   "joinRoom": "参加",
   "joinRoomPlaceholder": "ルームコードを入力",

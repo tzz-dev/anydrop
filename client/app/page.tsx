@@ -41,6 +41,7 @@ export default function Home() {
 
   const [joinInput, setJoinInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  const [createPasswordInput, setCreatePasswordInput] = useState('');
   const exclusiveRef = useRef(false);
 
   useEffect(() => {
@@ -332,50 +333,61 @@ export default function Home() {
   // ── Private mode — no room ────────────────────────────────────────────────
   if (!privateRoom) {
     return (
-      <main className="flex flex-col items-center justify-center flex-1 p-8">
-        <div className="flex flex-col items-center gap-4 w-full max-w-xs">
-          <p className="text-muted-foreground text-sm">{t('subtitle')}</p>
-
-          <input
-            value={passwordInput}
-            onChange={(e) => setPasswordInput(e.target.value)}
-            placeholder={t('passwordPlaceholder')}
-            type="password"
-            className={inputClass}
-          />
-
-          <Button
-            className="w-full"
-            onClick={() => joinPrivateRoom(generateRoomCode(), passwordInput, true)}
-          >
-            {t('createPrivateRoom')}
-          </Button>
-
-          <div className="flex items-center gap-3 w-full">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-muted-foreground">{t('or')}</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-
-          <div className="flex gap-2 w-full">
-            <input
-              value={joinInput}
-              onChange={(e) => setJoinInput(e.target.value.toUpperCase())}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && joinInput.trim()) joinPrivateRoom(joinInput.trim(), passwordInput, false);
-              }}
-              placeholder={t('joinRoomPlaceholder')}
-              maxLength={6}
-              className={`${inputClass} font-mono tracking-widest`}
-            />
-            <Button
-              variant="outline"
-              onClick={() => { if (joinInput.trim()) joinPrivateRoom(joinInput.trim(), passwordInput, false); }}
-              disabled={!joinInput.trim()}
-            >
-              {t('joinRoom')}
-            </Button>
-          </div>
+      <main className="flex flex-col items-center justify-center flex-1 p-8 gap-6">
+        <p className="text-muted-foreground text-sm">{t('subtitle')}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">{t('createPrivateRoom')}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <input
+                value={createPasswordInput}
+                onChange={(e) => setCreatePasswordInput(e.target.value)}
+                placeholder={t('passwordPlaceholder')}
+                type="password"
+                className={inputClass}
+              />
+              <Button
+                className="w-full"
+                onClick={() => joinPrivateRoom(generateRoomCode(), createPasswordInput, true)}
+              >
+                {t('create')}
+              </Button>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">{t('joinRoom')}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <input
+                value={joinInput}
+                onChange={(e) => setJoinInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && joinInput.trim()) joinPrivateRoom(joinInput.trim(), passwordInput, false);
+                }}
+                placeholder={t('joinRoomPlaceholder')}
+                maxLength={6}
+                className={`${inputClass} font-mono tracking-widest`}
+              />
+              <input
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder={t('passwordPlaceholder')}
+                type="password"
+                className={inputClass}
+              />
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => { if (joinInput.trim()) joinPrivateRoom(joinInput.trim(), passwordInput, false); }}
+                disabled={!joinInput.trim()}
+              >
+                {t('joinRoom')}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </main>
     );

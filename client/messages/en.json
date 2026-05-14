@@ -12,6 +12,7 @@
   "dropToSend": "Drop to send",
   "toastReceived": "Received: {name} ({size})",
   "toastSending": "Sending: {name}",
+  "create": "Create",
   "createPrivateRoom": "Create Private Room",
   "joinRoom": "Join",
   "joinRoomPlaceholder": "Enter room code",

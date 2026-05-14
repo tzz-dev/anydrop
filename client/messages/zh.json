@@ -12,6 +12,7 @@
   "dropToSend": "松开发送",
   "toastReceived": "已接收：{name} ({size})",
   "toastSending": "正在发送：{name}",
+  "create": "创建",
   "createPrivateRoom": "创建私密房间",
   "joinRoom": "加入",
   "joinRoomPlaceholder": "输入房间码",
