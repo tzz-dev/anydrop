@@ -3,6 +3,7 @@ module.exports = {
     {
       name: 'anydrop-server',
       script: 'dist/index.js',
+      cwd: '/app/anydrop/server',
       instances: 1,
       autorestart: true,
       watch: false,
