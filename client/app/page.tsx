@@ -2,29 +2,19 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Copy, LogOut, Share2 } from 'lucide-react';
 import type { Device, ServerMessage } from '@/lib/signaling';
 import type { TransferProgress } from '@/lib/webrtc';
 import { useSignaling } from '@/lib/useSignaling';
 import { usePeers } from '@/lib/usePeers';
 import { useMode } from '@/lib/mode';
-import { TransferProgressCard } from '@/components/TransferProgressCard';
-import {
-  formatBytes,
-  getSignalingHttpBase,
-  hashPassword,
-  generateRoomCode,
-} from '@/lib/utils';
+import { formatBytes, getSignalingHttpBase, hashPassword, generateRoomCode } from '@/lib/utils';
+import { LanModeView } from '@/components/LanModeView';
+import { PrivateRoomLobby } from '@/components/PrivateRoomLobby';
+import { PrivateRoomView } from '@/components/PrivateRoomView';
 
 const SERVER_ERROR_KEYS = ['error.wrongPassword', 'error.roomFull', 'error.roomNotFound'];
 const ROOM_CODE_RE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
-
-const inputClass =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
 export default function Home() {
   const t = useTranslations();
@@ -38,10 +28,6 @@ export default function Home() {
   pendingRoomRef.current = pendingRoom;
   const privatePasswordHashRef = useRef('');
   const privateRoomCreateRef = useRef(true);
-
-  const [joinInput, setJoinInput] = useState('');
-  const [passwordInput, setPasswordInput] = useState('');
-  const [createPasswordInput, setCreatePasswordInput] = useState('');
   const exclusiveRef = useRef(false);
 
   useEffect(() => {
@@ -59,14 +45,11 @@ export default function Home() {
 
   const connectionRoom = mode === 'lan' ? autoRoom : (pendingRoom ?? privateRoom);
 
-  // ── UI state ──────────────────────────────────────────────────────────────
+  // ── Device / transfer state ───────────────────────────────────────────────
   const [devices, setDevices] = useState<Device[]>([]);
   const [selfId, setSelfId] = useState('');
   const [progresses, setProgresses] = useState<Map<string, TransferProgress>>(new Map());
-  const [selectedPeer, setSelectedPeer] = useState<string | null>(null);
-  const [dragOverPeer, setDragOverPeer] = useState<string | null>(null);
   const selfIdRef = useRef('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Transfer callbacks ────────────────────────────────────────────────────
   const handleProgress = useCallback((p: TransferProgress) => {
@@ -127,8 +110,6 @@ export default function Home() {
       if (pendingRoomRef.current) {
         setPrivateRoom(pendingRoomRef.current);
         setPendingRoom(null);
-        setJoinInput('');
-        setPasswordInput('');
       }
       closeStalePeers(new Set(msg.devices.map((d) => d.id)));
       setDevices(msg.devices);
@@ -168,42 +149,26 @@ export default function Home() {
     setSelfId('');
     selfIdRef.current = '';
     setProgresses(new Map());
-    return () => {
-      closeAllPeers();
-    };
+    return () => { closeAllPeers(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionRoom, mode]);
 
   // ── File sending ──────────────────────────────────────────────────────────
-  const handleSendFile = async (file: File, peerId: string) => {
+  const handleSendFile = useCallback(async (file: File, peerId: string) => {
     const peer = getOrCreatePeer(peerId, true);
     toast.info(t('toastSending', { name: file.name }));
     await peer.sendFile(file);
-  };
-
-  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    const peer = selectedPeer;
-    if (!files.length || !peer) return;
-    e.target.value = '';
-    setSelectedPeer(null);
-    files.reduce((p, file) => p.then(() => handleSendFile(file, peer)), Promise.resolve());
-  };
-
-  const onDeviceClick = (peerId: string) => {
-    setSelectedPeer(peerId);
-    fileInputRef.current?.click();
-  };
+  }, [getOrCreatePeer, t]);
 
   // ── Room helpers ──────────────────────────────────────────────────────────
-  const copyRoomCode = (code: string) => {
+  const copyRoomCode = useCallback((code: string) => {
     navigator.clipboard.writeText(code).then(
       () => toast.success(t('copied')),
       () => toast.error(code),
     );
-  };
+  }, [t]);
 
-  const shareRoom = (code: string) => {
+  const shareRoom = useCallback((code: string) => {
     const url = `${window.location.origin}#${code}`;
     if (navigator.share) {
       navigator.share({ url }).catch(() => {});
@@ -213,36 +178,32 @@ export default function Home() {
         () => toast.error(url),
       );
     }
-  };
+  }, [t]);
 
-  const joinPrivateRoom = async (code: string, password: string, create: boolean) => {
+  const joinPrivateRoom = useCallback((code: string, password: string, create: boolean) => {
     if (!ROOM_CODE_RE.test(code)) {
       toast.error(t('errorInvalidRoomCode'));
       return;
     }
-    privatePasswordHashRef.current = password ? await hashPassword(password, code) : '';
-    privateRoomCreateRef.current = create;
-    exclusiveRef.current = create;
-    if (create) {
-      // Create: navigate immediately, clear inputs
-      setJoinInput('');
-      setPasswordInput('');
-      setPrivateRoom(code);
-    } else {
-      // Join: stay on lobby until server confirms with device-list
-      setPendingRoom(code);
-    }
-  };
+    (password ? hashPassword(password, code) : Promise.resolve('')).then((hash) => {
+      privatePasswordHashRef.current = hash;
+      privateRoomCreateRef.current = create;
+      exclusiveRef.current = create;
+      if (create) {
+        setPrivateRoom(code);
+      } else {
+        setPendingRoom(code);
+      }
+    });
+  }, [t]);
 
-  const leavePrivateRoom = () => {
+  const leavePrivateRoom = useCallback(() => {
     privatePasswordHashRef.current = '';
     privateRoomCreateRef.current = true;
     exclusiveRef.current = false;
     setPrivateRoom(null);
     setPendingRoom(null);
-    setJoinInput('');
-    setPasswordInput('');
-  };
+  }, []);
 
   // ── Derived state ─────────────────────────────────────────────────────────
   const self = devices.find((d) => d.id === selfId);
@@ -250,215 +211,38 @@ export default function Home() {
     (d) => d.id !== selfId && d.stableId !== self?.stableId,
   );
 
-  // ── Shared sub-views ──────────────────────────────────────────────────────
-  const deviceGrid = (
-    <div className="w-full max-w-2xl">
-      {otherDevices.length === 0 ? (
-        <Card className="text-center py-16">
-          <CardContent className="text-muted-foreground">
-            <p className="text-lg">{t('noDevices')}</p>
-            <p className="text-sm mt-1">{t('noDevicesHint')}</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3">
-          {otherDevices.map((device) => (
-            <Card
-              key={device.id}
-              className={`cursor-pointer transition-colors select-none ${
-                dragOverPeer === device.id
-                  ? 'border-primary bg-primary/5'
-                  : 'hover:border-primary'
-              }`}
-              onClick={() => onDeviceClick(device.id)}
-              onDragOver={(e) => { e.preventDefault(); setDragOverPeer(device.id); }}
-              onDragLeave={() => setDragOverPeer(null)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOverPeer(null);
-                const files = Array.from(e.dataTransfer.files);
-                files.reduce((p, file) => p.then(() => handleSendFile(file, device.id)), Promise.resolve());
-              }}
-            >
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base truncate">{device.name}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Button size="sm" variant="outline" className="w-full pointer-events-none">
-                  {dragOverPeer === device.id ? t('dropToSend') : t('clickToSend')}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  // ── LAN mode ──────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   if (mode === 'lan') {
     return (
-      <main className="flex flex-col items-center flex-1 p-8 gap-8">
-        <div className="flex flex-col items-center gap-2 mt-8">
-          {autoRoom && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{t('room')}</span>
-              <span className="font-mono font-semibold tracking-widest text-sm">{autoRoom}</span>
-              <button
-                onClick={() => copyRoomCode(autoRoom)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Copy size={14} />
-              </button>
-              <button
-                onClick={() => shareRoom(autoRoom)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Share2 size={14} />
-              </button>
-            </div>
-          )}
-          <Badge variant={connected ? 'default' : 'secondary'}>
-            {connected ? t('connected', { name: self?.name ?? '' }) : t('connecting')}
-          </Badge>
-        </div>
-
-        <TransferProgressCard progresses={progresses} />
-        {deviceGrid}
-        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={onFileSelected} />
-      </main>
+      <LanModeView
+        autoRoom={autoRoom}
+        connected={connected}
+        self={self}
+        otherDevices={otherDevices}
+        progresses={progresses}
+        onSendFile={handleSendFile}
+        onCopyRoomCode={copyRoomCode}
+        onShareRoom={shareRoom}
+      />
     );
   }
 
-  // ── Private mode — no room ────────────────────────────────────────────────
   if (!privateRoom) {
-    return (
-      <main className="flex flex-col items-center justify-center flex-1 p-8 gap-6">
-        <p className="text-muted-foreground text-sm">{t('subtitle')}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{t('createPrivateRoom')}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <input
-                value={createPasswordInput}
-                onChange={(e) => setCreatePasswordInput(e.target.value)}
-                placeholder={t('passwordPlaceholder')}
-                type="password"
-                className={inputClass}
-              />
-              <Button
-                className="w-full"
-                onClick={() => joinPrivateRoom(generateRoomCode(), createPasswordInput, true)}
-              >
-                {t('create')}
-              </Button>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{t('joinRoom')}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <input
-                value={joinInput}
-                onChange={(e) => setJoinInput(e.target.value.toUpperCase())}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && joinInput.trim()) joinPrivateRoom(joinInput.trim(), passwordInput, false);
-                }}
-                placeholder={t('joinRoomPlaceholder')}
-                maxLength={6}
-                className={`${inputClass} font-mono tracking-widest`}
-              />
-              <input
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder={t('passwordPlaceholder')}
-                type="password"
-                className={inputClass}
-              />
-              <Button
-                className="w-full"
-                onClick={() => { if (joinInput.trim()) joinPrivateRoom(joinInput.trim(), passwordInput, false); }}
-                disabled={!joinInput.trim()}
-              >
-                {t('joinRoom')}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    );
+    return <PrivateRoomLobby onJoinRoom={joinPrivateRoom} />;
   }
 
-  // ── Private mode — in room ────────────────────────────────────────────────
   return (
-    <main className="flex flex-col items-center flex-1 p-8 gap-8">
-      <div className="flex flex-col items-center gap-2 mt-8">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{t('room')}</span>
-          <span className="font-mono font-semibold tracking-widest text-sm">{privateRoom}</span>
-          <button
-            onClick={() => copyRoomCode(privateRoom)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Copy size={14} />
-          </button>
-          <button
-            onClick={() => shareRoom(privateRoom)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Share2 size={14} />
-          </button>
-          <button
-            onClick={leavePrivateRoom}
-            aria-label={t('leaveRoom')}
-            title={t('leaveRoom')}
-            className="text-muted-foreground hover:text-foreground transition-colors ml-1"
-          >
-            <LogOut size={14} />
-          </button>
-        </div>
-        <Badge variant={connected ? 'default' : 'secondary'}>
-          {connected ? t('connected', { name: self?.name ?? '' }) : t('connecting')}
-        </Badge>
-        <div className="flex gap-1.5 mt-1">
-          <input
-            value={joinInput}
-            onChange={(e) => setJoinInput(e.target.value.toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && joinInput.trim()) joinPrivateRoom(joinInput.trim(), passwordInput, false);
-            }}
-            placeholder={t('joinRoomPlaceholder')}
-            maxLength={6}
-            className="flex h-7 w-28 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono tracking-widest"
-          />
-          <input
-            value={passwordInput}
-            onChange={(e) => setPasswordInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && joinInput.trim()) joinPrivateRoom(joinInput.trim(), passwordInput, false);
-            }}
-            placeholder={t('passwordPlaceholder')}
-            type="password"
-            className="flex h-7 w-28 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 px-2 text-xs"
-            onClick={() => { if (joinInput.trim()) joinPrivateRoom(joinInput.trim(), passwordInput, false); }}
-            disabled={!joinInput.trim()}
-          >
-            {t('joinRoom')}
-          </Button>
-        </div>
-      </div>
-
-      <TransferProgressCard progresses={progresses} />
-      {deviceGrid}
-      <input ref={fileInputRef} type="file" multiple className="hidden" onChange={onFileSelected} />
-    </main>
+    <PrivateRoomView
+      privateRoom={privateRoom}
+      connected={connected}
+      self={self}
+      otherDevices={otherDevices}
+      progresses={progresses}
+      onSendFile={handleSendFile}
+      onCopyRoomCode={copyRoomCode}
+      onShareRoom={shareRoom}
+      onLeaveRoom={leavePrivateRoom}
+      onJoinRoom={joinPrivateRoom}
+    />
   );
 }
