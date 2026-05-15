@@ -111,6 +111,7 @@ export function Header() {
                 {label}
               </button>
             ))}
+            <div className="w-px h-4 bg-border mx-1" />
             <a
               href="https://github.com/tzz-zhao/anydrop"
               target="_blank"
