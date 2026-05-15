@@ -31,6 +31,9 @@ export interface IncomingFile {
 export type OnProgressCallback = (progress: TransferProgress) => void;
 export type OnFileReceivedCallback = (file: File) => void;
 export type OnErrorCallback = (error: string) => void;
+export type OnTextReceivedCallback = (peerId: string, text: string) => void;
+
+const MAX_TEXT_SIZE = 10_000;
 
 export class PeerConnection {
   private pc: RTCPeerConnection;
@@ -41,6 +44,7 @@ export class PeerConnection {
   private onProgress: OnProgressCallback;
   private onFileReceived: OnFileReceivedCallback;
   private onError: OnErrorCallback;
+  private onTextReceived: OnTextReceivedCallback;
   private incoming: IncomingFile | null = null;
   private pendingCandidates: RTCIceCandidateInit[] = [];
   private hasRemoteDescription = false;
@@ -58,6 +62,7 @@ export class PeerConnection {
     onProgress: OnProgressCallback;
     onFileReceived: OnFileReceivedCallback;
     onError: OnErrorCallback;
+    onTextReceived: OnTextReceivedCallback;
   }) {
     this.signaling = opts.signaling;
     this.peerId = opts.peerId;
@@ -65,6 +70,7 @@ export class PeerConnection {
     this.onProgress = opts.onProgress;
     this.onFileReceived = opts.onFileReceived;
     this.onError = opts.onError;
+    this.onTextReceived = opts.onTextReceived;
     // the peer with the smaller selfId is polite and rolls back on collision
     this.polite = opts.selfId < opts.peerId;
 
@@ -105,8 +111,18 @@ export class PeerConnection {
     dc.onmessage = (event) => {
       if (typeof event.data === 'string') {
         try {
-          const meta = JSON.parse(event.data) as { name: string; size: number; type: string };
-          // validate metadata to guard against malicious peers
+          const parsed = JSON.parse(event.data) as {
+            kind?: string; text?: string;
+            name?: string; size?: number; type?: string;
+          };
+          if (parsed.kind === 'message') {
+            if (typeof parsed.text === 'string' && parsed.text.length > 0 && parsed.text.length <= MAX_TEXT_SIZE) {
+              this.onTextReceived(this.peerId, parsed.text);
+            }
+            return;
+          }
+          // file metadata (kind === 'file' or legacy without kind)
+          const meta = parsed as { name: string; size: number; type: string };
           if (
             typeof meta.name !== 'string' || meta.name.length > 255 ||
             typeof meta.size !== 'number' || meta.size < 0 ||
@@ -233,7 +249,7 @@ export class PeerConnection {
     }
 
     const dc = this.dc!;
-    dc.send(JSON.stringify({ name: file.name, size: file.size, type: file.type }));
+    dc.send(JSON.stringify({ kind: 'file', name: file.name, size: file.size, type: file.type }));
 
     let offset = 0;
     while (offset < file.size) {
@@ -269,6 +285,18 @@ export class PeerConnection {
         direction: 'send',
         peerId: this.peerId,
       });
+    }
+  }
+
+  async sendMessage(text: string) {
+    if (!text || text.length > MAX_TEXT_SIZE) return;
+    try {
+      await this.waitForChannelOpen();
+    } catch {
+      return;
+    }
+    if (this.dc?.readyState === 'open') {
+      this.dc.send(JSON.stringify({ kind: 'message', text }));
     }
   }
 

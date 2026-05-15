@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Copy, Share2 } from 'lucide-react';
 import type { Device } from '@/lib/signaling';
 import type { TransferProgress } from '@/lib/webrtc';
+import type { ChatMessage } from '@/lib/chat';
 import { DeviceGrid } from '@/components/DeviceGrid';
 
 interface Props {
@@ -13,13 +14,16 @@ interface Props {
   self: Device | undefined;
   otherDevices: Device[];
   progresses: Map<string, TransferProgress>;
+  chatMessages: Map<string, ChatMessage[]>;
   onSendFile: (file: File, peerId: string) => Promise<void>;
+  onSendMessage: (peerId: string, text: string) => void;
   onCopyRoomCode: (code: string) => void;
   onShareRoom: (code: string) => void;
 }
 
 export function LanModeView({
-  autoRoom, connected, self, otherDevices, progresses, onSendFile, onCopyRoomCode, onShareRoom,
+  autoRoom, connected, self, otherDevices, progresses, chatMessages,
+  onSendFile, onSendMessage, onCopyRoomCode, onShareRoom,
 }: Props) {
   const t = useTranslations();
 
@@ -48,7 +52,7 @@ export function LanModeView({
           {connected ? t('connected', { name: self?.name ?? '' }) : t('connecting')}
         </Badge>
       </div>
-      <DeviceGrid otherDevices={otherDevices} progresses={progresses} onSendFile={onSendFile} />
+      <DeviceGrid otherDevices={otherDevices} progresses={progresses} chatMessages={chatMessages} onSendFile={onSendFile} onSendMessage={onSendMessage} />
     </main>
   );
 }

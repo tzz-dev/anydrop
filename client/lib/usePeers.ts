@@ -15,6 +15,7 @@ export function usePeers(
   onProgress: (p: TransferProgress) => void,
   onFileReceived: (file: File) => void,
   onError: (key: string) => void,
+  onTextReceived: (peerId: string, text: string) => void,
 ) {
   const peersRef = useRef<Map<string, PeerConnection>>(new Map());
 
@@ -28,13 +29,14 @@ export function usePeers(
         onProgress,
         onFileReceived,
         onError,
+        onTextReceived,
       });
       peersRef.current.set(peerId, peer);
       // initiate() is async — capture errors here since callers don't await it
       if (initiate) peer.initiate().catch((e: Error) => onError(e.message));
       return peer;
     },
-    [signalingRef, selfIdRef, onProgress, onFileReceived, onError],
+    [signalingRef, selfIdRef, onProgress, onFileReceived, onError, onTextReceived],
   );
 
   /** Close and remove peers whose ids are not in the active set. */
@@ -52,5 +54,9 @@ export function usePeers(
     peersRef.current.clear();
   }, []);
 
-  return { peersRef, getOrCreatePeer, closeStalePeers, closeAllPeers };
+  const sendMessage = useCallback((peerId: string, text: string) => {
+    peersRef.current.get(peerId)?.sendMessage(text).catch(() => {});
+  }, []);
+
+  return { peersRef, getOrCreatePeer, closeStalePeers, closeAllPeers, sendMessage };
 }

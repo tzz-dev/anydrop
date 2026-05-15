@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Copy, LogOut, Share2 } from 'lucide-react';
 import type { Device } from '@/lib/signaling';
 import type { TransferProgress } from '@/lib/webrtc';
+import type { ChatMessage } from '@/lib/chat';
 import { DeviceGrid } from '@/components/DeviceGrid';
 
 interface Props {
@@ -15,7 +16,9 @@ interface Props {
   self: Device | undefined;
   otherDevices: Device[];
   progresses: Map<string, TransferProgress>;
+  chatMessages: Map<string, ChatMessage[]>;
   onSendFile: (file: File, peerId: string) => Promise<void>;
+  onSendMessage: (peerId: string, text: string) => void;
   onCopyRoomCode: (code: string) => void;
   onShareRoom: (code: string) => void;
   onLeaveRoom: () => void;
@@ -23,8 +26,8 @@ interface Props {
 }
 
 export function PrivateRoomView({
-  privateRoom, connected, self, otherDevices, progresses, onSendFile,
-  onCopyRoomCode, onShareRoom, onLeaveRoom, onJoinRoom,
+  privateRoom, connected, self, otherDevices, progresses, chatMessages,
+  onSendFile, onSendMessage, onCopyRoomCode, onShareRoom, onLeaveRoom, onJoinRoom,
 }: Props) {
   const t = useTranslations();
   const [joinCode, setJoinCode] = useState('');
@@ -95,7 +98,7 @@ export function PrivateRoomView({
           </Button>
         </div>
       </div>
-      <DeviceGrid otherDevices={otherDevices} progresses={progresses} onSendFile={onSendFile} />
+      <DeviceGrid otherDevices={otherDevices} progresses={progresses} chatMessages={chatMessages} onSendFile={onSendFile} onSendMessage={onSendMessage} />
     </main>
   );
 }

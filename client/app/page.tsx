@@ -12,6 +12,7 @@ import { formatBytes, getSignalingHttpBase, hashPassword, generateRoomCode } fro
 import { LanModeView } from '@/components/LanModeView';
 import { PrivateRoomLobby } from '@/components/PrivateRoomLobby';
 import { PrivateRoomView } from '@/components/PrivateRoomView';
+import type { ChatMessage } from '@/lib/chat';
 
 const SERVER_ERROR_KEYS = ['error.wrongPassword', 'error.roomFull', 'error.roomNotFound'];
 const ROOM_CODE_RE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
@@ -45,10 +46,11 @@ export default function Home() {
 
   const connectionRoom = mode === 'lan' ? autoRoom : (pendingRoom ?? privateRoom);
 
-  // ── Device / transfer state ───────────────────────────────────────────────
+  // ── Device / transfer / chat state ───────────────────────────────────────
   const [devices, setDevices] = useState<Device[]>([]);
   const [selfId, setSelfId] = useState('');
   const [progresses, setProgresses] = useState<Map<string, TransferProgress>>(new Map());
+  const [chatMessages, setChatMessages] = useState<Map<string, ChatMessage[]>>(new Map());
   const selfIdRef = useRef('');
 
   // ── Transfer callbacks ────────────────────────────────────────────────────
@@ -76,18 +78,38 @@ export default function Home() {
     toast.error(t(key as Parameters<typeof t>[0]));
   }, [t]);
 
+  // ── Chat callbacks ────────────────────────────────────────────────────────
+  const addChatMessage = useCallback((peerId: string, text: string, direction: ChatMessage['direction']) => {
+    setChatMessages((prev) => {
+      const next = new Map(prev);
+      const msgs = next.get(peerId) ?? [];
+      next.set(peerId, [...msgs, { id: crypto.randomUUID(), text, direction, timestamp: Date.now() }]);
+      return next;
+    });
+  }, []);
+
+  const handleTextReceived = useCallback((peerId: string, text: string) => {
+    addChatMessage(peerId, text, 'receive');
+  }, [addChatMessage]);
+
   // ── Peer connections ──────────────────────────────────────────────────────
   // signalingRef is populated by useSignaling; we declare it here so usePeers
   // can hold a stable reference before the signaling hook fills it in.
   const signalingRef = useRef<import('@/lib/signaling').SignalingClient | null>(null);
 
-  const { peersRef, getOrCreatePeer, closeStalePeers, closeAllPeers } = usePeers(
+  const { peersRef, getOrCreatePeer, closeStalePeers, closeAllPeers, sendMessage } = usePeers(
     signalingRef,
     selfIdRef,
     handleProgress,
     handleFileReceived,
     handleError,
+    handleTextReceived,
   );
+
+  const handleSendMessage = useCallback((peerId: string, text: string) => {
+    sendMessage(peerId, text);
+    addChatMessage(peerId, text, 'send');
+  }, [sendMessage, addChatMessage]);
 
   // ── Message handler (forward-ref pattern to break circular hook dependency) ─
   // useSignaling must be called before onMessage is defined (it needs usePeers
@@ -149,6 +171,7 @@ export default function Home() {
     setSelfId('');
     selfIdRef.current = '';
     setProgresses(new Map());
+    setChatMessages(new Map());
     return () => { closeAllPeers(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionRoom, mode]);
@@ -220,7 +243,9 @@ export default function Home() {
         self={self}
         otherDevices={otherDevices}
         progresses={progresses}
+        chatMessages={chatMessages}
         onSendFile={handleSendFile}
+        onSendMessage={handleSendMessage}
         onCopyRoomCode={copyRoomCode}
         onShareRoom={shareRoom}
       />
@@ -238,7 +263,9 @@ export default function Home() {
       self={self}
       otherDevices={otherDevices}
       progresses={progresses}
+      chatMessages={chatMessages}
       onSendFile={handleSendFile}
+      onSendMessage={handleSendMessage}
       onCopyRoomCode={copyRoomCode}
       onShareRoom={shareRoom}
       onLeaveRoom={leavePrivateRoom}
