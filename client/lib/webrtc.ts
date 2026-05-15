@@ -121,6 +121,10 @@ export class PeerConnection {
             }
             return;
           }
+          if (parsed.kind === 'cancel') {
+            this.incoming = null;
+            return;
+          }
           // file metadata (kind === 'file' or legacy without kind)
           const meta = parsed as { name: string; size: number; type: string };
           if (
@@ -240,7 +244,7 @@ export class PeerConnection {
     await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
   }
 
-  async sendFile(file: File) {
+  async sendFile(file: File, signal?: AbortSignal) {
     try {
       await this.waitForChannelOpen();
     } catch (e) {
@@ -248,32 +252,41 @@ export class PeerConnection {
       return;
     }
 
+    if (signal?.aborted) return;
+
     const dc = this.dc!;
     dc.send(JSON.stringify({ kind: 'file', name: file.name, size: file.size, type: file.type }));
 
     let offset = 0;
     while (offset < file.size) {
       if (dc.readyState !== 'open') return;
+      if (signal?.aborted) {
+        dc.send(JSON.stringify({ kind: 'cancel' }));
+        return;
+      }
 
       if (dc.bufferedAmount > 16 * 1024 * 1024) {
         await new Promise<void>((resolve) => {
-          const onClose = () => {
+          const cleanup = () => {
             dc.removeEventListener('close', onClose);
             dc.onbufferedamountlow = null;
-            resolve();
+            signal?.removeEventListener('abort', onAbort);
           };
+          const onClose = () => { cleanup(); resolve(); };
+          const onAbort = () => { cleanup(); resolve(); };
           dc.addEventListener('close', onClose, { once: true });
-          dc.onbufferedamountlow = () => {
-            dc.removeEventListener('close', onClose);
-            dc.onbufferedamountlow = null;
-            resolve();
-          };
+          dc.onbufferedamountlow = () => { cleanup(); resolve(); };
+          signal?.addEventListener('abort', onAbort, { once: true });
         });
         continue;
       }
 
       const chunk = await file.slice(offset, offset + CHUNK_SIZE).arrayBuffer();
       if (dc.readyState !== 'open') return;
+      if (signal?.aborted) {
+        dc.send(JSON.stringify({ kind: 'cancel' }));
+        return;
+      }
 
       dc.send(chunk);
       offset += chunk.byteLength;

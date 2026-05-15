@@ -13,6 +13,7 @@
   "messagePlaceholder": "メッセージ、または画像を貼り付け…",
   "noMessages": "メッセージはありません",
   "attachFile": "ファイルを添付",
+  "queued": "待機中",
   "toastReceived": "受信完了：{name} ({size})",
   "toastSending": "送信中：{name}",
   "create": "作成",

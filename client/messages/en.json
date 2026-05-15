@@ -13,6 +13,7 @@
   "messagePlaceholder": "Message, or paste image…",
   "noMessages": "No messages yet",
   "attachFile": "Attach file",
+  "queued": "queued",
   "toastReceived": "Received: {name} ({size})",
   "toastSending": "Sending: {name}",
   "create": "Create",

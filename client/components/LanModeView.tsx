@@ -15,7 +15,7 @@ interface Props {
   otherDevices: Device[];
   progresses: Map<string, TransferProgress>;
   chatMessages: Map<string, ChatMessage[]>;
-  onSendFile: (file: File, peerId: string) => Promise<void>;
+  onSendFile: (file: File, peerId: string, signal?: AbortSignal) => Promise<void>;
   onSendMessage: (peerId: string, text: string) => void;
   onCopyRoomCode: (code: string) => void;
   onShareRoom: (code: string) => void;

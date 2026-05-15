@@ -177,10 +177,10 @@ export default function Home() {
   }, [connectionRoom, mode]);
 
   // ── File sending ──────────────────────────────────────────────────────────
-  const handleSendFile = useCallback(async (file: File, peerId: string) => {
+  const handleSendFile = useCallback(async (file: File, peerId: string, signal?: AbortSignal) => {
     const peer = getOrCreatePeer(peerId, true);
     toast.info(t('toastSending', { name: file.name }));
-    await peer.sendFile(file);
+    await peer.sendFile(file, signal);
   }, [getOrCreatePeer, t]);
 
   // ── Room helpers ──────────────────────────────────────────────────────────
