@@ -55,8 +55,9 @@ export function usePeers(
   }, []);
 
   const sendMessage = useCallback((peerId: string, text: string) => {
-    peersRef.current.get(peerId)?.sendMessage(text).catch(() => {});
-  }, []);
+    const peer = getOrCreatePeer(peerId, true);
+    peer.sendMessage(text).catch(() => {});
+  }, [getOrCreatePeer]);
 
   return { peersRef, getOrCreatePeer, closeStalePeers, closeAllPeers, sendMessage };
 }
