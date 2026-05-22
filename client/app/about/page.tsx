@@ -9,7 +9,6 @@ export default function AboutPage() {
     { title: t('about.whatTitle'), body: t('about.whatBody') },
     { title: t('about.howTitle'), body: t('about.howBody') },
     { title: t('about.privacyTitle'), body: t('about.privacyBody') },
-    { title: t('about.techTitle'), body: t('about.techBody') },
   ];
 
   return (

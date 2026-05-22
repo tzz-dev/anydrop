@@ -36,8 +36,6 @@
     "howBody": "Devices communicate directly via WebRTC DataChannel. The signaling server is only used to exchange connection info (SDP and ICE candidates). Once the P2P connection is established, files and messages travel directly between devices — no server in the middle.",
     "privacyTitle": "Privacy",
     "privacyBody": "File contents never touch the server. Everything is transferred peer-to-peer between your device and the recipient. The server stores no files, messages, or personal data.",
-    "techTitle": "Tech stack",
-    "techBody": "Frontend: Next.js + Tailwind CSS. Peer-to-peer: WebRTC DataChannel. Signaling: Node.js server on AWS EC2, proxied by Caddy over HTTPS."
   },
   "errorSignalingUnreachable": "Cannot reach signaling server — is it running?",
   "errorInvalidRoomCode": "Invalid room code — must be 6 letters or digits",
