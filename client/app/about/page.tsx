@@ -12,7 +12,7 @@ export default function AboutPage() {
   ];
 
   return (
-    <main className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-10">
+    <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-10">
       <h1 className="text-2xl font-bold mb-1">AnyDrop</h1>
       <p className="text-muted-foreground mb-8">{t('about.tagline')}</p>
 

@@ -174,7 +174,7 @@ export function DeviceGrid({ otherDevices, progresses, chatMessages, onSendFile,
   return (
     <>
       <TransferProgressCard progresses={filteredProgresses} />
-      <div className="w-full max-w-2xl flex flex-col gap-4">
+      <div className="w-full max-w-3xl flex flex-col gap-4">
         {otherDevices.length === 0 ? (
           <Card className="text-center py-16">
             <CardContent className="text-muted-foreground">

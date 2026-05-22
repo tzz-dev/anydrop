@@ -85,7 +85,7 @@ export function Header() {
 
   return (
     <header className="w-full border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6">
         {/* main row: logo + desktop mode switcher + locale selector */}
         <div className="h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
