@@ -27,6 +27,18 @@
   "copiedLink": "リンクをコピーしました",
   "leaveRoom": "ルームを退出",
   "footer": "© 2026 AnyDrop — P2Pファイル転送",
+  "aboutLink": "About",
+  "about": {
+    "tagline": "アカウント不要・インストール不要。ブラウザだけでファイル転送。",
+    "whatTitle": "AnyDrop とは",
+    "whatBody": "AnyDrop はブラウザで動く P2P ファイル転送ツールです。同じローカルネットワーク内のデバイスは自動で検出されます。プライベートルームを作成してルームコードを共有すれば、任意の 2 台のデバイスを接続することもできます。",
+    "howTitle": "仕組み",
+    "howBody": "デバイス間は WebRTC DataChannel で直接通信します。シグナリングサーバーは接続情報（SDP と ICE candidate）の交換にのみ使用されます。P2P 接続が確立された後は、ファイルやメッセージはデバイス間を直接やり取りし、サーバーを経由しません。",
+    "privacyTitle": "プライバシー",
+    "privacyBody": "ファイルの内容はサーバーを通過しません。すべてあなたのデバイスと相手のデバイスの間で直接転送されます。サーバーはファイル・メッセージ・個人情報を一切保存しません。",
+    "techTitle": "技術スタック",
+    "techBody": "フロントエンド：Next.js + Tailwind CSS。P2P 通信：WebRTC DataChannel。シグナリング：AWS EC2 上の Node.js サーバー、Caddy で HTTPS リバースプロキシ。"
+  },
   "errorSignalingUnreachable": "シグナリングサーバーに接続できません。起動しているか確認してください",
   "errorInvalidRoomCode": "ルームコードが無効です。6文字の英数字を入力してください",
   "errorBoundaryMessage": "エラーが発生しました",

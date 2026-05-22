@@ -27,6 +27,18 @@
   "copiedLink": "已复制链接",
   "leaveRoom": "离开房间",
   "footer": "© 2026 AnyDrop — P2P 文件传输",
+  "aboutLink": "关于",
+  "about": {
+    "tagline": "无需账号，无需安装，直接在浏览器里传文件。",
+    "whatTitle": "AnyDrop 是什么",
+    "whatBody": "AnyDrop 是一款运行在浏览器里的 P2P 文件传输工具。同一局域网内的设备可以自动发现彼此；也可以创建私密房间，通过房间码将任意两台设备连接起来。",
+    "howTitle": "工作原理",
+    "howBody": "设备之间通过 WebRTC DataChannel 直接传输数据。信令服务器仅用于交换连接信息（SDP 和 ICE candidate），一旦 P2P 连接建立，文件和消息就直接在两台设备之间传输，不经过任何中间服务器。",
+    "privacyTitle": "隐私说明",
+    "privacyBody": "文件内容不会经过服务器，只在你的设备和对方设备之间点对点传输。服务器不存储任何文件、消息或个人信息。",
+    "techTitle": "技术栈",
+    "techBody": "前端使用 Next.js + Tailwind CSS，WebRTC 实现点对点通信，Node.js 信令服务器部署在 AWS EC2 上，由 Caddy 提供 HTTPS 反向代理。"
+  },
   "errorSignalingUnreachable": "无法连接到信令服务器，请确认服务器已启动",
   "errorInvalidRoomCode": "房间码无效，请输入 6 位字母或数字",
   "errorBoundaryMessage": "页面发生错误",
