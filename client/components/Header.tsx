@@ -112,6 +112,9 @@ export function Header() {
               </button>
             ))}
             <div className="w-px h-4 bg-border mx-1" />
+            <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1">
+              {t('aboutLink')}
+            </Link>
             <a
               href="https://github.com/tzz-zhao/anydrop"
               target="_blank"
