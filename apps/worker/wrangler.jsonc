@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "anydrop-signal",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ANYDROP_ROOM",
+        "class_name": "AnydropRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["AnydropRoom"]
+    }
+  ]
+}

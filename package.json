@@ -1,0 +1,17 @@
+{
+  "name": "anydrop",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n web,worker -c blue,yellow \"pnpm --filter ./apps/web dev\" \"pnpm --filter ./apps/worker dev\"",
+    "typecheck": "pnpm -r run typecheck"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@11.10.0",
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  }
+}

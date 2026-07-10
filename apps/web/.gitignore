@@ -1,0 +1,21 @@
+# Repo-wide rules (node_modules, .next/, .env*, *.tsbuildinfo, next-env.d.ts,
+# .DS_Store, *.pem, ...) live in the root .gitignore. Only Next.js-specific
+# extras not covered there go here — anything duplicated risks shadowing the
+# root's `!.env.example` exception, since a deeper .gitignore's patterns are
+# evaluated after the root's.
+/coverage
+/build
+.vercel
+
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
