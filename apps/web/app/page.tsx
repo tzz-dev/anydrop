@@ -5,6 +5,7 @@ import { useRoom } from "@/lib/useRoom";
 import { PeerManager, type PeerManagerEvent } from "@/lib/webrtc/peerManager";
 import { getIdentity, type Identity } from "@/lib/identity";
 import { downloadBlob } from "@/lib/download";
+import Logo from "@/components/Logo";
 import PeerList from "@/components/PeerList";
 import DropZone from "@/components/DropZone";
 import IncomingTransferDialog, { type IncomingOffer } from "@/components/IncomingTransferDialog";
@@ -174,7 +175,10 @@ export default function Page() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-10">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">anydrop</h1>
+        <div className="flex items-center gap-2">
+          <Logo />
+          <h1 className="text-2xl font-semibold">anydrop</h1>
+        </div>
         <p className="text-sm text-black/50 dark:text-white/50">
           {identity ? `你是 ${identity.displayName}` : "正在连接…"}
           {selectedPeer ? ` · 已选中 ${selectedPeer.displayName}` : ""}
