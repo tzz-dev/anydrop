@@ -1,6 +1,7 @@
 "use client";
 
 import type { PeerInfo } from "@anydrop/protocol";
+import { useI18n } from "@/lib/i18n/context";
 import DeviceAvatar from "./DeviceAvatar";
 
 export default function PeerList({
@@ -12,11 +13,13 @@ export default function PeerList({
   selectedConnectionId: string | null;
   onSelect: (connectionId: string) => void;
 }) {
+  const { t } = useI18n();
+
   if (peers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-black/10 p-10 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
-        <p>还没有发现同网络下的其他设备</p>
-        <p>让另一台设备打开同一个页面试试</p>
+        <p>{t.peersEmptyTitle}</p>
+        <p>{t.peersEmptyHint}</p>
       </div>
     );
   }

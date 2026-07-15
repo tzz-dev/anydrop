@@ -5,7 +5,9 @@ import { useRoom } from "@/lib/useRoom";
 import { PeerManager, type PeerManagerEvent } from "@/lib/webrtc/peerManager";
 import { getIdentity, type Identity } from "@/lib/identity";
 import { downloadBlob } from "@/lib/download";
+import { useI18n } from "@/lib/i18n/context";
 import Logo from "@/components/Logo";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import PeerList from "@/components/PeerList";
 import DropZone from "@/components/DropZone";
 import IncomingTransferDialog, { type IncomingOffer } from "@/components/IncomingTransferDialog";
@@ -30,6 +32,7 @@ export default function Page() {
   // sessionStorage isn't available during SSR, so the server snapshot is
   // null and the real identity appears once the client takes over.
   const identity = useSyncExternalStore(subscribeNever, getIdentity, getServerIdentitySnapshot);
+  const { t } = useI18n();
 
   const room = useRoom(identity);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
@@ -166,7 +169,7 @@ export default function Page() {
 
   const receivedTexts: ReceivedTextView[] = rawTexts.map((item) => ({
     textId: item.textId,
-    senderName: room.peers.find((peer) => peer.connectionId === item.connectionId)?.displayName ?? "对方设备",
+    senderName: room.peers.find((peer) => peer.connectionId === item.connectionId)?.displayName ?? t.unknownSender,
     text: item.text,
   }));
 
@@ -175,34 +178,37 @@ export default function Page() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-10">
       <header className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <Logo />
-          <h1 className="text-2xl font-semibold">anydrop</h1>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Logo />
+            <h1 className="text-2xl font-semibold">anydrop</h1>
+          </div>
+          <LanguageSwitcher />
         </div>
         <p className="text-sm text-black/50 dark:text-white/50">
-          {identity ? `你是 ${identity.displayName}` : "正在连接…"}
-          {selectedPeer ? ` · 已选中 ${selectedPeer.displayName}` : ""}
+          {identity ? t.youAre(identity.displayName) : t.connecting}
+          {selectedPeer ? ` · ${t.selected(selectedPeer.displayName)}` : ""}
         </p>
       </header>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-black/60 dark:text-white/60">同网络设备</h2>
+        <h2 className="text-sm font-medium text-black/60 dark:text-white/60">{t.sectionPeers}</h2>
         <PeerList peers={room.peers} selectedConnectionId={effectiveSelectedConnectionId} onSelect={setSelectedConnectionId} />
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-black/60 dark:text-white/60">发送文件</h2>
+        <h2 className="text-sm font-medium text-black/60 dark:text-white/60">{t.sectionSend}</h2>
         <DropZone disabled={!effectiveSelectedConnectionId} onFiles={handleFiles} />
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-black/60 dark:text-white/60">文本 / 剪贴板</h2>
+        <h2 className="text-sm font-medium text-black/60 dark:text-white/60">{t.sectionText}</h2>
         <TextSharePanel disabled={!effectiveSelectedConnectionId} onSend={handleSendText} receivedTexts={receivedTexts} />
       </section>
 
       {transferList.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium text-black/60 dark:text-white/60">传输进度</h2>
+          <h2 className="text-sm font-medium text-black/60 dark:text-white/60">{t.sectionTransfers}</h2>
           <TransferProgress transfers={transferList} onCancel={handleCancelTransfer} />
         </section>
       )}

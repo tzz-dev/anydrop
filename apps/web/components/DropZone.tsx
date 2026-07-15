@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useI18n } from "@/lib/i18n/context";
 
 export default function DropZone({
   disabled,
@@ -9,6 +10,7 @@ export default function DropZone({
   disabled: boolean;
   onFiles: (files: File[]) => void;
 }) {
+  const { t } = useI18n();
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -48,7 +50,7 @@ export default function DropZone({
         }}
       />
       <p className="text-sm font-medium">
-        {disabled ? "先选择一个设备" : "拖拽文件到这里,或点击选择"}
+        {disabled ? t.dropDisabled : t.dropIdle}
       </p>
     </div>
   );

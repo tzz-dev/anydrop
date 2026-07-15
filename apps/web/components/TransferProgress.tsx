@@ -1,6 +1,7 @@
 "use client";
 
 import { formatBytes } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/context";
 
 export interface TransferView {
   transferId: string;
@@ -12,15 +13,6 @@ export interface TransferView {
   status: "awaiting-accept" | "in-progress" | "complete" | "rejected" | "canceled" | "error";
 }
 
-const STATUS_LABEL: Record<TransferView["status"], string> = {
-  "awaiting-accept": "等待对方确认",
-  "in-progress": "传输中",
-  complete: "已完成",
-  rejected: "对方已拒绝",
-  canceled: "已取消",
-  error: "传输失败",
-};
-
 export default function TransferProgress({
   transfers,
   onCancel,
@@ -28,6 +20,8 @@ export default function TransferProgress({
   transfers: TransferView[];
   onCancel: (transfer: TransferView) => void;
 }) {
+  const { t } = useI18n();
+
   if (transfers.length === 0) return null;
 
   return (
@@ -39,9 +33,9 @@ export default function TransferProgress({
           <div key={transfer.transferId} className="rounded-xl border border-black/10 p-4 dark:border-white/10">
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">
-                {transfer.direction === "send" ? "发送" : "接收"} · {transfer.name}
+                {transfer.direction === "send" ? t.transferSend : t.transferReceive} · {transfer.name}
               </span>
-              <span className="text-black/50 dark:text-white/50">{STATUS_LABEL[transfer.status]}</span>
+              <span className="text-black/50 dark:text-white/50">{t.transferStatus[transfer.status]}</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
               <div
@@ -55,7 +49,7 @@ export default function TransferProgress({
               </span>
               {transfer.status === "in-progress" && (
                 <button onClick={() => onCancel(transfer)} className="text-red-500 hover:underline">
-                  取消
+                  {t.transferCancel}
                 </button>
               )}
             </div>
