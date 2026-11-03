@@ -12,6 +12,6 @@
   "license": "ISC",
   "packageManager": "pnpm@11.22.0",
   "devDependencies": {
-    "concurrently": "^10.0.5"
+    "concurrently": "^10.0.6"
   }
 }
