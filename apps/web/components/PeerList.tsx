@@ -29,6 +29,7 @@ export default function PeerList({
       {peers.map((peer) => (
         <button
           key={peer.connectionId}
+          aria-pressed={selectedConnectionId === peer.connectionId}
           onClick={() => onSelect(peer.connectionId)}
           className={`flex flex-col items-center gap-2 rounded-xl border p-4 transition ${
             selectedConnectionId === peer.connectionId

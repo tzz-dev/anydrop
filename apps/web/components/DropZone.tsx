@@ -29,7 +29,17 @@ export default function DropZone({
         if (files.length > 0) onFiles(files);
       }}
       onClick={() => !disabled && inputRef.current?.click()}
-      className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-10 text-center transition ${
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled}
+      onKeyDown={(event) => {
+        if (disabled || event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          inputRef.current?.click();
+        }
+      }}
+      className={`flex cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-500 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-10 text-center transition ${
         disabled
           ? "cursor-not-allowed border-black/10 text-black/30 dark:border-white/10 dark:text-white/30"
           : isDragging
