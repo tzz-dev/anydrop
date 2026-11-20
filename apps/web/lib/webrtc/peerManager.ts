@@ -10,7 +10,7 @@ import {
   type ServerSignalMessage,
 } from "@anydrop/protocol";
 import { parseControlMessage } from "./controlMessage";
-import { receiveFile, sendFile, TransferAbortedError, type IncomingFileTransfer } from "./fileTransfer";
+import { receiveFile, sendFile, TransferAbortedError, type FileSink, type IncomingFileTransfer } from "./fileTransfer";
 
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
 
@@ -61,6 +61,8 @@ interface PendingIncomingOffer {
   // Data is only accepted on a file channel after the user explicitly
   // accepted the offer — otherwise a peer could skip the dialog entirely.
   accepted: boolean;
+  // Set when the user chose to stream a large file straight to disk.
+  sink?: FileSink;
 }
 
 interface PeerEntry {
@@ -138,12 +140,19 @@ export class PeerManager {
     control.send(JSON.stringify(msg));
   }
 
-  acceptFileOffer(connectionId: string, transferId: string) {
+  // Returns false if the offer no longer exists (e.g. the sender canceled
+  // while the user was still deciding); the sink, if any, is discarded then.
+  acceptFileOffer(connectionId: string, transferId: string, sink?: FileSink): boolean {
     const entry = this.peers.get(connectionId);
     const pending = entry?.incoming.get(transferId);
-    if (!entry || !pending) return;
+    if (!entry || !pending) {
+      void sink?.abort();
+      return false;
+    }
     pending.accepted = true;
+    pending.sink = sink;
     this.sendControl(entry, { type: "file-accept", transferId });
+    return true;
   }
 
   rejectFileOffer(connectionId: string, transferId: string) {
@@ -161,9 +170,7 @@ export class PeerManager {
     // "file-accept" must not start the transfer.
     entry.outgoing.delete(transferId);
     entry.outgoingAbort.get(transferId)?.abort();
-    entry.incomingTransfer.get(transferId)?.abort();
-    entry.incomingTransfer.delete(transferId);
-    entry.incoming.delete(transferId);
+    this.discardIncoming(entry, transferId);
 
     this.sendControl(entry, { type: "file-cancel", transferId });
     this.emit({ kind: "transfer-canceled", transferId });
@@ -171,6 +178,15 @@ export class PeerManager {
 
   closeAll() {
     for (const connectionId of [...this.peers.keys()]) this.dropPeer(connectionId, "closed");
+  }
+
+  // Forgets an incoming transfer in any state: stops receiving, and discards
+  // a half-written file if the data was being streamed to disk.
+  private discardIncoming(entry: PeerEntry, transferId: string) {
+    entry.incomingTransfer.get(transferId)?.abort();
+    entry.incomingTransfer.delete(transferId);
+    void entry.incoming.get(transferId)?.sink?.abort();
+    entry.incoming.delete(transferId);
   }
 
   private sendControl(entry: PeerEntry, msg: ControlMessage) {
@@ -190,6 +206,7 @@ export class PeerManager {
     ]);
     for (const controller of entry.outgoingAbort.values()) controller.abort();
     for (const transfer of entry.incomingTransfer.values()) transfer.abort();
+    for (const pending of entry.incoming.values()) void pending.sink?.abort();
 
     entry.pc.onicecandidate = null;
     entry.pc.ondatachannel = null;
@@ -387,9 +404,7 @@ export class PeerManager {
       case "file-cancel":
         entry.outgoing.delete(msg.transferId);
         entry.outgoingAbort.get(msg.transferId)?.abort();
-        entry.incomingTransfer.get(msg.transferId)?.abort();
-        entry.incomingTransfer.delete(msg.transferId);
-        entry.incoming.delete(msg.transferId);
+        this.discardIncoming(entry, msg.transferId);
         this.emit({ kind: "transfer-canceled", transferId: msg.transferId });
         break;
 
@@ -411,7 +426,10 @@ export class PeerManager {
       if (channel.readyState !== "closed") channel.close();
     };
 
+    let opened = false;
+
     channel.onopen = () => {
+      opened = true;
       sendFile(
         channel,
         offer.file,
@@ -429,15 +447,17 @@ export class PeerManager {
         .finally(cleanup);
     };
 
-    // If the channel dies before it ever opens, surface that instead of
-    // leaving the transfer stuck.
-    channel.onerror = () => {
-      if (entry.outgoingAbort.has(offer.transferId)) {
-        this.emit({ kind: "transfer-error", transferId: offer.transferId, message: "data channel error" });
-        abortController.abort();
-        cleanup();
-      }
+    // If the channel dies before it ever opens (error, or closed by a peer
+    // that refused the data), surface that instead of leaving the transfer
+    // stuck. Once open, sendFile reports failures itself.
+    const failBeforeOpen = (message: string) => {
+      if (opened || !entry.outgoingAbort.has(offer.transferId)) return;
+      this.emit({ kind: "transfer-error", transferId: offer.transferId, message });
+      abortController.abort();
+      cleanup();
     };
+    channel.onerror = () => failBeforeOpen("data channel error");
+    channel.onclose = () => failBeforeOpen("data channel closed before it opened");
   }
 
   private wireIncomingFileChannel(entry: PeerEntry, channel: RTCDataChannel) {
@@ -463,7 +483,8 @@ export class PeerManager {
           kind: "transfer-complete",
           transferId,
           direction: "receive",
-          blob,
+          // null when the data was streamed straight to disk.
+          blob: blob ?? undefined,
           name: pending.name,
           mime: pending.mime,
         });
@@ -473,6 +494,7 @@ export class PeerManager {
         entry.incomingTransfer.delete(transferId);
         this.emit({ kind: "transfer-error", transferId, message });
       },
+      pending.sink,
     );
     entry.incomingTransfer.set(transferId, transfer);
   }
