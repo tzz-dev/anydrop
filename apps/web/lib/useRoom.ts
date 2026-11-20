@@ -14,7 +14,24 @@ export interface RoomHandle {
   onMessage: (listener: ServerMessageListener) => () => void;
 }
 
-const SIGNAL_URL = process.env.NEXT_PUBLIC_SIGNAL_URL ?? "ws://127.0.0.1:8787";
+// Only fall back to the local wrangler dev server in development; a production
+// build without NEXT_PUBLIC_SIGNAL_URL would otherwise silently try to reach
+// the visitor's own machine (and be blocked as mixed content on https).
+const SIGNAL_URL =
+  process.env.NEXT_PUBLIC_SIGNAL_URL ?? (process.env.NODE_ENV === "production" ? undefined : "ws://127.0.0.1:8787");
+
+function parseServerMessage(raw: unknown): ServerSignalMessage | null {
+  if (typeof raw !== "string") return null;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (typeof value === "object" && value !== null && typeof (value as { type?: unknown }).type === "string") {
+      return value as ServerSignalMessage;
+    }
+  } catch {
+    // malformed frame
+  }
+  return null;
+}
 
 export function useRoom(identity: Identity | null): RoomHandle {
   const [connectionId, setConnectionId] = useState<string | null>(null);
@@ -24,12 +41,17 @@ export function useRoom(identity: Identity | null): RoomHandle {
 
   useEffect(() => {
     if (!identity) return;
+    if (!SIGNAL_URL) {
+      console.error("NEXT_PUBLIC_SIGNAL_URL is not set; cannot connect to the signaling server");
+      return;
+    }
 
     const socket = new ReconnectingWebSocket(`${SIGNAL_URL}/connect`);
     socketRef.current = socket;
 
     socket.addEventListener("message", (event: MessageEvent<string>) => {
-      const msg = JSON.parse(event.data) as ServerSignalMessage;
+      const msg = parseServerMessage(event.data);
+      if (!msg) return;
 
       switch (msg.type) {
         case "welcome": {

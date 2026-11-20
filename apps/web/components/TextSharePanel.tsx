@@ -62,7 +62,7 @@ export default function TextSharePanel({
                 <p className="whitespace-pre-wrap break-words">{item.text}</p>
               </div>
               <button
-                onClick={() => navigator.clipboard.writeText(item.text)}
+                onClick={() => void navigator.clipboard?.writeText(item.text).catch(() => {})}
                 className="shrink-0 text-xs text-blue-600 hover:underline"
               >
                 {t.textCopy}

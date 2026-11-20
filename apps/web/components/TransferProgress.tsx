@@ -47,7 +47,7 @@ export default function TransferProgress({
               <span>
                 {formatBytes(transfer.bytesDone)} / {formatBytes(transfer.size)}
               </span>
-              {transfer.status === "in-progress" && (
+              {(transfer.status === "in-progress" || transfer.status === "awaiting-accept") && (
                 <button onClick={() => onCancel(transfer)} className="text-red-500 hover:underline">
                   {t.transferCancel}
                 </button>

@@ -20,6 +20,8 @@ interface RawReceivedText {
   text: string;
 }
 
+const MAX_RECEIVED_TEXTS = 50;
+
 function subscribeNever() {
   return () => {};
 }
@@ -62,7 +64,9 @@ export default function Page() {
         break;
 
       case "incoming-text":
-        setRawTexts((prev) => [...prev, { textId: event.textId, connectionId: event.connectionId, text: event.text }]);
+        setRawTexts((prev) =>
+          [...prev, { textId: event.textId, connectionId: event.connectionId, text: event.text }].slice(-MAX_RECEIVED_TEXTS),
+        );
         break;
 
       case "send-progress":
@@ -90,6 +94,13 @@ export default function Page() {
 
       case "transfer-canceled":
         setTransfers((prev) => updateTransfer(prev, event.transferId, { status: "canceled" }));
+        // A sender withdrawing an offer we haven't answered yet must also
+        // dismiss its dialog.
+        setIncomingOffers((prev) => prev.filter((offer) => offer.transferId !== event.transferId));
+        break;
+
+      case "peer-gone":
+        setIncomingOffers((prev) => prev.filter((offer) => offer.connectionId !== event.connectionId));
         break;
 
       case "transfer-error":
@@ -110,6 +121,18 @@ export default function Page() {
   );
 
   useEffect(() => {
+    peerManager.setLocalConnectionId(room.connectionId);
+  }, [room.connectionId, peerManager]);
+
+  // Close WebRTC connections (and fail their transfers) for peers that left.
+  useEffect(() => {
+    peerManager.syncPeers(room.peers.map((peer) => peer.connectionId));
+  }, [room.peers, peerManager]);
+
+  // Tear everything down when leaving the page.
+  useEffect(() => () => peerManager.closeAll(), [peerManager]);
+
+  useEffect(() => {
     return room.onMessage((msg) => peerManager.handleServerMessage(msg));
     // room.onMessage and peerManager are both stable for the component's
     // lifetime; `room` itself is a fresh object every render, so it's
@@ -119,21 +142,33 @@ export default function Page() {
 
   const handleFiles = async (files: File[]) => {
     if (!effectiveSelectedConnectionId) return;
-    for (const file of files) {
-      const transferId = await peerManager.connectAndOfferFile(effectiveSelectedConnectionId, file);
-      setTransfers((prev) => ({
-        ...prev,
-        [transferId]: {
-          transferId,
-          connectionId: effectiveSelectedConnectionId,
-          name: file.name,
-          size: file.size,
-          direction: "send",
-          bytesDone: 0,
-          status: "awaiting-accept",
-        },
-      }));
-    }
+    const connectionId = effectiveSelectedConnectionId;
+
+    await Promise.all(
+      files.map(async (file) => {
+        // Register the transfer before connecting so it shows up immediately
+        // and can be marked failed if the peer never becomes reachable.
+        const transferId = crypto.randomUUID();
+        setTransfers((prev) => ({
+          ...prev,
+          [transferId]: {
+            transferId,
+            connectionId,
+            name: file.name,
+            size: file.size,
+            direction: "send",
+            bytesDone: 0,
+            status: "awaiting-accept",
+          },
+        }));
+        try {
+          await peerManager.offerFile(connectionId, file, transferId);
+        } catch (error) {
+          console.warn("failed to offer file", error);
+          setTransfers((prev) => updateTransfer(prev, transferId, { status: "error" }));
+        }
+      }),
+    );
   };
 
   const handleAcceptOffer = (offer: IncomingOffer) => {
@@ -164,7 +199,9 @@ export default function Page() {
 
   const handleSendText = (text: string) => {
     if (!effectiveSelectedConnectionId) return;
-    void peerManager.sendText(effectiveSelectedConnectionId, text);
+    peerManager.sendText(effectiveSelectedConnectionId, text).catch((error) => {
+      console.warn("failed to send text", error);
+    });
   };
 
   const receivedTexts: ReceivedTextView[] = rawTexts.map((item) => ({
@@ -173,7 +210,9 @@ export default function Page() {
     text: item.text,
   }));
 
-  const transferList = Object.values(transfers).sort((a, b) => (a.transferId < b.transferId ? 1 : -1));
+  // Object keys are UUID strings, so insertion order == creation order;
+  // reverse for newest-first.
+  const transferList = Object.values(transfers).reverse();
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-10">
