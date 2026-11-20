@@ -6,3 +6,7 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   workerd: true
+overrides:
+  # GHSA: minimatch >=7.0.0 <11.0.1 is vulnerable to DoS via globparts
+  # amplification. Only reachable transitively via shadcn -> ts-morph.
+  "minimatch@>=7.0.0 <11.0.1": ">=11.0.1"
