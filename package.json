@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n web,worker -c blue,yellow \"pnpm --filter ./apps/web dev\" \"pnpm --filter ./apps/worker dev\"",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r --if-present run test"
   },
   "keywords": [],
   "author": "",
