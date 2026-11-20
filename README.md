@@ -67,7 +67,9 @@ pnpm deploy
 
 ## Known limitations
 
-- Received files are assembled in memory, so very large files can exhaust browser memory.
+- Received files are assembled in memory. In browsers with the File System Access API (desktop
+  Chrome/Edge) files of 256 MB or more are streamed straight to a file you pick instead; in other
+  browsers files over 512 MB are refused up front, since they would not fit in memory.
 - Text messages are delivered without a confirmation prompt, and device names are
   self-reported, so anyone sharing your room can send you text and pick any name.
 - Without a TURN server, some networks (e.g. symmetric NAT) can't establish a direct connection.

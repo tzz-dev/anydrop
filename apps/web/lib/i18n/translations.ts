@@ -32,6 +32,7 @@ export interface Dictionary {
   incomingWantsToSend: (name: string) => string;
   incomingReject: string;
   incomingAccept: string;
+  incomingTooLarge: (limit: string) => string;
   transferStatus: Record<TransferView["status"], string>;
   transferSend: string;
   transferReceive: string;
@@ -64,6 +65,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     incomingWantsToSend: (name) => `${name} 想发送文件`,
     incomingReject: "拒绝",
     incomingAccept: "接受",
+    incomingTooLarge: (limit) => `文件超过此浏览器可接收的上限(${limit}),请改用桌面版 Chrome / Edge 接收`,
     transferStatus: {
       "awaiting-accept": "等待对方确认",
       "in-progress": "传输中",
@@ -101,6 +103,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     incomingWantsToSend: (name) => `${name} wants to send a file`,
     incomingReject: "Decline",
     incomingAccept: "Accept",
+    incomingTooLarge: (limit) => `This file is larger than this browser can receive (${limit}). Use desktop Chrome or Edge instead.`,
     transferStatus: {
       "awaiting-accept": "Waiting for approval",
       "in-progress": "In progress",
@@ -138,6 +141,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     incomingWantsToSend: (name) => `${name} がファイルを送信しようとしています`,
     incomingReject: "拒否",
     incomingAccept: "受け入れる",
+    incomingTooLarge: (limit) => `このブラウザで受信できる上限(${limit})を超えています。デスクトップ版の Chrome / Edge をご利用ください`,
     transferStatus: {
       "awaiting-accept": "相手の確認待ち",
       "in-progress": "転送中",

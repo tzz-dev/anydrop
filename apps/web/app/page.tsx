@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRoom } from "@/lib/useRoom";
 import { PeerManager, type PeerManagerEvent } from "@/lib/webrtc/peerManager";
 import { getIdentity, type Identity } from "@/lib/identity";
 import { downloadBlob } from "@/lib/download";
+import { canReceiveSize, pickFileSink, shouldStreamToDisk } from "@/lib/saveFile";
+import type { FileSink } from "@/lib/webrtc/fileTransfer";
 import { useI18n } from "@/lib/i18n/context";
 import Logo from "@/components/Logo";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -171,8 +173,38 @@ export default function Page() {
     );
   };
 
-  const handleAcceptOffer = (offer: IncomingOffer) => {
-    peerManager.acceptFileOffer(offer.connectionId, offer.transferId);
+  // Offers whose save dialog is currently open, so a second click can't open another.
+  const acceptingRef = useRef(new Set<string>());
+
+  const handleAcceptOffer = async (offer: IncomingOffer) => {
+    if (!canReceiveSize(offer.size) || acceptingRef.current.has(offer.transferId)) return;
+    acceptingRef.current.add(offer.transferId);
+    try {
+      await acceptOffer(offer);
+    } finally {
+      acceptingRef.current.delete(offer.transferId);
+    }
+  };
+
+  const acceptOffer = async (offer: IncomingOffer) => {
+
+    // Big files are streamed to a user-chosen file instead of buffered in
+    // memory. The save dialog must open straight from this click, so it
+    // happens before anything else; dismissing it keeps the offer pending.
+    let sink: FileSink | undefined;
+    if (shouldStreamToDisk(offer.size)) {
+      try {
+        sink = await pickFileSink(offer.name);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          console.warn("failed to open save dialog", error);
+        }
+        return;
+      }
+    }
+
+    // The sender may have canceled or left while the save dialog was open.
+    if (!peerManager.acceptFileOffer(offer.connectionId, offer.transferId, sink)) return;
     setIncomingOffers((prev) => prev.filter((item) => item.transferId !== offer.transferId));
     setTransfers((prev) => ({
       ...prev,
@@ -274,7 +306,13 @@ export default function Page() {
         </section>
       )}
 
-      <IncomingTransferDialog offers={incomingOffers} peers={room.peers} onAccept={handleAcceptOffer} onReject={handleRejectOffer} />
+      <IncomingTransferDialog
+        offers={incomingOffers}
+        peers={room.peers}
+        canReceive={(offer) => canReceiveSize(offer.size)}
+        onAccept={handleAcceptOffer}
+        onReject={handleRejectOffer}
+      />
     </div>
   );
 }

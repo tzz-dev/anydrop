@@ -5,6 +5,7 @@ import type { PeerInfo } from "@anydrop/protocol";
 import { useI18n } from "@/lib/i18n/context";
 import DeviceAvatar from "./DeviceAvatar";
 import { formatBytes } from "@/lib/format";
+import { MAX_IN_MEMORY_BYTES } from "@/lib/saveFile";
 
 export interface IncomingOffer {
   connectionId: string;
@@ -17,11 +18,14 @@ export interface IncomingOffer {
 export default function IncomingTransferDialog({
   offers,
   peers,
+  canReceive,
   onAccept,
   onReject,
 }: {
   offers: IncomingOffer[];
   peers: PeerInfo[];
+  // Whether this browser is able to receive the offered file at all.
+  canReceive: (offer: IncomingOffer) => boolean;
   onAccept: (offer: IncomingOffer) => void;
   onReject: (offer: IncomingOffer) => void;
 }) {
@@ -41,6 +45,7 @@ export default function IncomingTransferDialog({
   if (!offer) return null;
   const sender = peers.find((peer) => peer.connectionId === offer.connectionId);
   const senderName = sender?.displayName ?? t.unknownDevice;
+  const receivable = canReceive(offer);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -86,6 +91,11 @@ export default function IncomingTransferDialog({
             </p>
           </div>
         </div>
+        {!receivable && (
+          <p role="alert" className="mt-4 text-sm text-red-500">
+            {t.incomingTooLarge(formatBytes(MAX_IN_MEMORY_BYTES))}
+          </p>
+        )}
         <div className="mt-6 flex justify-end gap-3">
           <button
             ref={rejectRef}
@@ -96,7 +106,8 @@ export default function IncomingTransferDialog({
           </button>
           <button
             onClick={() => onAccept(offer)}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            disabled={!receivable}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {t.incomingAccept}
           </button>
