@@ -26,26 +26,41 @@ function generateIdentity(): Identity {
   };
 }
 
+function isIdentity(value: unknown): value is Identity {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.peerId === "string" && v.peerId.length > 0 && typeof v.displayName === "string" && v.displayName.length > 0;
+}
+
 // Cached after the first read so repeated calls return the same object
 // reference — required for safe use as a useSyncExternalStore snapshot.
 let cached: Identity | null = null;
 
 // Per-tab identity, not per-device: multiple tabs on one machine intentionally
 // show up as separate peers, which is convenient for local testing.
+// sessionStorage can throw (privacy modes, blocked storage), so it is strictly
+// best-effort: without it the identity just lives in memory for this page load.
 export function getIdentity(): Identity {
   if (cached) return cached;
 
-  const stored = sessionStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    try {
-      cached = JSON.parse(stored) as Identity;
-      return cached;
-    } catch {
-      // fall through and regenerate a fresh identity
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed: unknown = JSON.parse(stored);
+      if (isIdentity(parsed)) {
+        cached = { peerId: parsed.peerId, displayName: parsed.displayName };
+        return cached;
+      }
     }
+  } catch {
+    // fall through and regenerate a fresh identity
   }
 
   cached = generateIdentity();
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(cached));
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(cached));
+  } catch {
+    // ignore: identity stays in memory only
+  }
   return cached;
 }
