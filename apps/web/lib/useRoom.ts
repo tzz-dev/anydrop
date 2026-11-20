@@ -7,7 +7,10 @@ import type { Identity } from "./identity";
 
 type ServerMessageListener = (msg: ServerSignalMessage) => void;
 
+export type RoomStatus = "connecting" | "connected" | "disconnected";
+
 export interface RoomHandle {
+  status: RoomStatus;
   connectionId: string | null;
   peers: PeerInfo[];
   send: (msg: ClientSignalMessage) => void;
@@ -36,6 +39,7 @@ function parseServerMessage(raw: unknown): ServerSignalMessage | null {
 export function useRoom(identity: Identity | null): RoomHandle {
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [peers, setPeers] = useState<PeerInfo[]>([]);
+  const [status, setStatus] = useState<RoomStatus>("connecting");
   const socketRef = useRef<ReconnectingWebSocket | null>(null);
   const listenersRef = useRef(new Set<ServerMessageListener>());
 
@@ -48,6 +52,12 @@ export function useRoom(identity: Identity | null): RoomHandle {
 
     const socket = new ReconnectingWebSocket(`${SIGNAL_URL}/connect`);
     socketRef.current = socket;
+
+    // The roster is intentionally kept while disconnected: existing WebRTC
+    // links don't depend on the signaling socket, so transfers in flight
+    // survive a blip. It is refreshed as soon as the socket reconnects.
+    socket.addEventListener("open", () => setStatus("connected"));
+    socket.addEventListener("close", () => setStatus("disconnected"));
 
     socket.addEventListener("message", (event: MessageEvent<string>) => {
       const msg = parseServerMessage(event.data);
@@ -77,6 +87,7 @@ export function useRoom(identity: Identity | null): RoomHandle {
       socketRef.current = null;
       setConnectionId(null);
       setPeers([]);
+      setStatus("connecting");
     };
   }, [identity]);
 
@@ -93,5 +104,5 @@ export function useRoom(identity: Identity | null): RoomHandle {
     [],
   );
 
-  return { connectionId, peers, send, onMessage };
+  return { status, connectionId, peers, send, onMessage };
 }

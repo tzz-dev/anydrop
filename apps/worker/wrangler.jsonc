@@ -2,6 +2,8 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "anydrop-signal",
   "main": "src/index.ts",
+  // Required secret (not stored here): `wrangler secret put ROOM_SALT`.
+  // For local dev copy .dev.vars.example to .dev.vars.
   "compatibility_date": "2026-07-01",
   "durable_objects": {
     "bindings": [

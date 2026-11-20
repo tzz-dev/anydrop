@@ -6,6 +6,13 @@ export { AnydropRoom } from "./room";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // Fail loudly instead of silently hashing with salt "undefined" when the
+    // secret was never provisioned (`wrangler secret put ROOM_SALT`).
+    if (!env.ROOM_SALT) {
+      console.error("ROOM_SALT is not configured");
+      return new Response("Server misconfigured", { status: 500 });
+    }
+
     const url = new URL(request.url);
     if (url.pathname !== "/connect") {
       return new Response("Not Found", { status: 404 });

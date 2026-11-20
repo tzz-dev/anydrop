@@ -36,6 +36,9 @@ export interface Dictionary {
   transferSend: string;
   transferReceive: string;
   transferCancel: string;
+  transfersClear: string;
+  textSendFailed: string;
+  connectionLost: string;
 }
 
 export const dictionaries: Record<Locale, Dictionary> = {
@@ -72,6 +75,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
     transferSend: "发送",
     transferReceive: "接收",
     transferCancel: "取消",
+    transfersClear: "清除已结束的传输",
+    textSendFailed: "发送失败,请重试",
+    connectionLost: "与服务器的连接已断开,正在重连…",
   },
   en: {
     connecting: "Connecting…",
@@ -106,6 +112,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
     transferSend: "Send",
     transferReceive: "Receive",
     transferCancel: "Cancel",
+    transfersClear: "Clear finished",
+    textSendFailed: "Failed to send, please try again",
+    connectionLost: "Connection to the server was lost. Reconnecting…",
   },
   ja: {
     connecting: "接続中…",
@@ -140,5 +149,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     transferSend: "送信",
     transferReceive: "受信",
     transferCancel: "キャンセル",
+    transfersClear: "完了した転送を消去",
+    textSendFailed: "送信に失敗しました。もう一度お試しください",
+    connectionLost: "サーバーとの接続が切れました。再接続中…",
   },
 };

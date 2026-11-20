@@ -197,11 +197,18 @@ export default function Page() {
     peerManager.cancelTransfer(transfer.connectionId, transfer.transferId);
   };
 
-  const handleSendText = (text: string) => {
-    if (!effectiveSelectedConnectionId) return;
-    peerManager.sendText(effectiveSelectedConnectionId, text).catch((error) => {
-      console.warn("failed to send text", error);
-    });
+  // Rejects on failure so the text panel can keep the draft and show an error.
+  const handleSendText = async (text: string) => {
+    if (!effectiveSelectedConnectionId) throw new Error("no peer selected");
+    await peerManager.sendText(effectiveSelectedConnectionId, text);
+  };
+
+  const handleClearFinished = () => {
+    setTransfers((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).filter(([, transfer]) => transfer.status === "awaiting-accept" || transfer.status === "in-progress"),
+      ),
+    );
   };
 
   const receivedTexts: ReceivedTextView[] = rawTexts.map((item) => ({
@@ -213,6 +220,9 @@ export default function Page() {
   // Object keys are UUID strings, so insertion order == creation order;
   // reverse for newest-first.
   const transferList = Object.values(transfers).reverse();
+  const hasFinishedTransfers = transferList.some(
+    (transfer) => transfer.status !== "awaiting-accept" && transfer.status !== "in-progress",
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-10">
@@ -228,6 +238,11 @@ export default function Page() {
           {identity ? t.youAre(identity.displayName) : t.connecting}
           {selectedPeer ? ` · ${t.selected(selectedPeer.displayName)}` : ""}
         </p>
+        {identity && room.status === "disconnected" && (
+          <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
+            {t.connectionLost}
+          </p>
+        )}
       </header>
 
       <section className="flex flex-col gap-3">
@@ -247,7 +262,14 @@ export default function Page() {
 
       {transferList.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium text-black/60 dark:text-white/60">{t.sectionTransfers}</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-black/60 dark:text-white/60">{t.sectionTransfers}</h2>
+            {hasFinishedTransfers && (
+              <button onClick={handleClearFinished} className="text-xs text-blue-600 hover:underline">
+                {t.transfersClear}
+              </button>
+            )}
+          </div>
           <TransferProgress transfers={transferList} onCancel={handleCancelTransfer} />
         </section>
       )}
