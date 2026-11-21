@@ -23,6 +23,13 @@ export interface RoomHandle {
 const SIGNAL_URL =
   process.env.NEXT_PUBLIC_SIGNAL_URL ?? (process.env.NODE_ENV === "production" ? undefined : "ws://127.0.0.1:8787");
 
+// The Worker answers "ping" with "pong" without waking its Durable Object.
+// Hearing nothing back means the socket is dead even though the browser may
+// not have noticed yet (sleeping laptop, lost WiFi), so force a reconnect.
+const HEARTBEAT_INTERVAL_MS = 20_000;
+const HEARTBEAT_DEAD_AFTER_MS = 50_000;
+const SOCKET_OPEN = 1;
+
 function parseServerMessage(raw: unknown): ServerSignalMessage | null {
   if (typeof raw !== "string") return null;
   try {
@@ -57,10 +64,27 @@ export function useRoom(identity: Identity | null): RoomHandle {
     // flicker; it is refreshed as soon as the socket reconnects. (Peers that
     // see us drop out of the room keep any in-flight transfer alive, see
     // PeerManager.syncPeers.)
-    socket.addEventListener("open", () => setStatus("connected"));
+    let lastHeard = Date.now();
+    const ping = () => {
+      if (socket.readyState !== SOCKET_OPEN) return;
+      if (Date.now() - lastHeard > HEARTBEAT_DEAD_AFTER_MS) {
+        lastHeard = Date.now();
+        socket.reconnect();
+        return;
+      }
+      socket.send("ping");
+    };
+    const heartbeat = setInterval(ping, HEARTBEAT_INTERVAL_MS);
+
+    socket.addEventListener("open", () => {
+      lastHeard = Date.now();
+      setStatus("connected");
+      ping();
+    });
     socket.addEventListener("close", () => setStatus("disconnected"));
 
     socket.addEventListener("message", (event: MessageEvent<string>) => {
+      lastHeard = Date.now();
       const msg = parseServerMessage(event.data);
       if (!msg) return;
 
@@ -87,6 +111,7 @@ export function useRoom(identity: Identity | null): RoomHandle {
     });
 
     return () => {
+      clearInterval(heartbeat);
       socket.close();
       socketRef.current = null;
       setConnectionId(null);

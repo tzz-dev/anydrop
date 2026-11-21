@@ -16,7 +16,24 @@ const MAX_CONNECTIONS_PER_ROOM = 64;
 const MESSAGE_LIMIT = 100;
 const MESSAGE_WINDOW_MS = 10_000;
 
+// Clients ping every ~20s and the runtime answers "ping" with "pong" without
+// waking the object. A connection that pinged before but has been silent this
+// long is dead (e.g. a phone that lost network without closing the socket).
+export const HEARTBEAT_PING = "ping";
+export const HEARTBEAT_PONG = "pong";
+const STALE_AFTER_MS = 60_000;
+const SWEEP_INTERVAL_MS = 30_000;
+
 export class AnydropRoom extends Server<Env> {
+  // Let the object hibernate while connections sit idle; connection state
+  // (peerId/displayName) lives in the socket attachment and survives that.
+  static options = { hibernate: true };
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(HEARTBEAT_PING, HEARTBEAT_PONG));
+  }
+
   // In-memory only; a reset on eviction just gives the connection a fresh budget.
   private limiters = new Map<string, RateLimiter>();
 
@@ -34,6 +51,8 @@ export class AnydropRoom extends Server<Env> {
       connection.close(4002, "room full");
       return;
     }
+
+    await this.scheduleSweep();
 
     const welcome: ServerSignalMessage = {
       type: "welcome",
@@ -89,10 +108,39 @@ export class AnydropRoom extends Server<Env> {
     this.broadcastRoster();
   }
 
-  private broadcastRoster() {
+  // Drops connections whose heartbeat stopped, so ghost devices disappear
+  // from everyone's list. Connections that never pinged (older clients) are
+  // left alone.
+  async onAlarm() {
+    const now = Date.now();
+    const dropped = new Set<string>();
+    for (const ws of this.ctx.getWebSockets()) {
+      const last = this.ctx.getWebSocketAutoResponseTimestamp(ws);
+      if (!last || now - last.getTime() <= STALE_AFTER_MS) continue;
+      const connection = this.getConnection<PeerConnectionState>(
+        (ws.deserializeAttachment() as { __pk?: { id?: string } } | null)?.__pk?.id ?? "",
+      );
+      if (connection) dropped.add(connection.id);
+      try {
+        ws.close(4003, "heartbeat timeout");
+      } catch {
+        // already closing
+      }
+    }
+    if (dropped.size > 0) this.broadcastRoster(dropped);
+    if (this.ctx.getWebSockets().length > dropped.size) await this.scheduleSweep();
+  }
+
+  private async scheduleSweep() {
+    if ((await this.ctx.storage.getAlarm()) === null) {
+      await this.ctx.storage.setAlarm(Date.now() + SWEEP_INTERVAL_MS);
+    }
+  }
+
+  private broadcastRoster(exclude: ReadonlySet<string> = new Set()) {
     const peers: PeerInfo[] = [];
     for (const connection of this.getConnections<PeerConnectionState>()) {
-      if (!connection.state) continue;
+      if (!connection.state || exclude.has(connection.id)) continue;
       peers.push({
         connectionId: connection.id,
         peerId: connection.state.peerId,
