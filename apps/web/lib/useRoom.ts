@@ -108,5 +108,7 @@ export function useRoom(identity: Identity | null): RoomHandle {
     [],
   );
 
-  return { status, connectionId, peers, send, onMessage };
+  // Without a signaling URL we can never connect; say so instead of staying
+  // in "connecting" forever.
+  return { status: SIGNAL_URL ? status : "disconnected", connectionId, peers, send, onMessage };
 }

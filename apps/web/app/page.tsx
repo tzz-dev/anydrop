@@ -19,7 +19,8 @@ import TextSharePanel, { type ReceivedTextView } from "@/components/TextSharePan
 
 interface RawReceivedText {
   textId: string;
-  connectionId: string;
+  // Resolved when the text arrives, so it survives the sender leaving.
+  senderName: string | null;
   text: string;
 }
 
@@ -40,6 +41,11 @@ export default function Page() {
   const { t } = useI18n();
 
   const room = useRoom(identity);
+  // The PeerManager callback is created once, so it reads the roster via a ref.
+  const peersRef = useRef(room.peers);
+  useEffect(() => {
+    peersRef.current = room.peers;
+  }, [room.peers]);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [incomingOffers, setIncomingOffers] = useState<IncomingOffer[]>([]);
   const [transfers, setTransfers] = useState<Record<string, TransferView>>({});
@@ -68,7 +74,14 @@ export default function Page() {
 
       case "incoming-text":
         setRawTexts((prev) =>
-          [...prev, { textId: event.textId, connectionId: event.connectionId, text: event.text }].slice(-MAX_RECEIVED_TEXTS),
+          [
+            ...prev,
+            {
+              textId: event.textId,
+              senderName: peersRef.current.find((peer) => peer.connectionId === event.connectionId)?.displayName ?? null,
+              text: event.text,
+            },
+          ].slice(-MAX_RECEIVED_TEXTS),
         );
         break;
 
@@ -107,7 +120,7 @@ export default function Page() {
         break;
 
       case "transfer-error":
-        setTransfers((prev) => updateTransfer(prev, event.transferId, { status: "error" }));
+        setTransfers((prev) => updateTransfer(prev, event.transferId, { status: "error", error: event.message }));
         break;
     }
   }
@@ -164,7 +177,7 @@ export default function Page() {
           await peerManager.offerFile(connectionId, file, transferId);
         } catch (error) {
           console.warn("failed to offer file", error);
-          setTransfers((prev) => updateTransfer(prev, transferId, { status: "error" }));
+          setTransfers((prev) => updateTransfer(prev, transferId, { status: "error", error: String(error) }));
         }
       }),
     );
@@ -241,7 +254,7 @@ export default function Page() {
 
   const receivedTexts: ReceivedTextView[] = rawTexts.map((item) => ({
     textId: item.textId,
-    senderName: room.peers.find((peer) => peer.connectionId === item.connectionId)?.displayName ?? t.unknownSender,
+    senderName: item.senderName ?? t.unknownSender,
     text: item.text,
   }));
 

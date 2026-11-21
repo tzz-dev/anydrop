@@ -24,7 +24,7 @@ export default function DeviceAvatar({
     <div
       className={`flex ${dimension} shrink-0 items-center justify-center rounded-full font-semibold text-white ${colorForId(id)}`}
     >
-      {name.charAt(0).toUpperCase()}
+      {(Array.from(name)[0] ?? "?").toUpperCase()}
     </div>
   );
 }

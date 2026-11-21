@@ -326,6 +326,9 @@ export class PeerManager {
   // promise, so nobody ever sends on a channel that is still connecting.
   private ensureControl(connectionId: string, entry: PeerEntry): Promise<RTCDataChannel> {
     if (entry.control?.readyState === "open") return Promise.resolve(entry.control);
+    if (entry.control && entry.control.readyState !== "connecting") {
+      return Promise.reject(new Error("control channel is closing"));
+    }
     if (entry.controlReady) return entry.controlReady;
 
     const channel = entry.pc.createDataChannel(CONTROL_CHANNEL_LABEL);

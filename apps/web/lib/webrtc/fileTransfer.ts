@@ -144,7 +144,10 @@ export function receiveFile(
 
     if (!sink) {
       settled = true;
-      onComplete(new Blob(chunks, { type: mime }));
+      const blob = new Blob(chunks, { type: mime });
+      // The Blob owns the data now; don't keep a second reference alive.
+      chunks.length = 0;
+      onComplete(blob);
       return;
     }
     // Let queued writes flush before closing the file.

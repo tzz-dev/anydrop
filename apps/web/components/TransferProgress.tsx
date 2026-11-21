@@ -10,6 +10,8 @@ export interface TransferView {
   size: number;
   direction: "send" | "receive";
   bytesDone: number;
+  // Technical reason for a failed transfer (shown as-is, not translated).
+  error?: string;
   status: "awaiting-accept" | "in-progress" | "complete" | "rejected" | "canceled" | "error";
 }
 
@@ -43,6 +45,9 @@ export default function TransferProgress({
                 style={{ width: `${transfer.status === "complete" ? 100 : percent}%` }}
               />
             </div>
+            {transfer.status === "error" && transfer.error && (
+              <p className="mt-1 break-words text-xs text-red-500">{transfer.error}</p>
+            )}
             <div className="mt-1 flex items-center justify-between text-xs text-black/50 dark:text-white/50">
               <span>
                 {formatBytes(transfer.bytesDone)} / {formatBytes(transfer.size)}
