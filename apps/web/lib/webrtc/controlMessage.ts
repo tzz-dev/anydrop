@@ -1,6 +1,31 @@
 import type { ControlMessage } from "@anydrop/protocol";
 
 const MAX_TEXT_LENGTH = 100_000;
+
+// Browsers differ in the largest single data channel message they accept
+// (RTCSctpTransport.maxMessageSize; Chrome and Safari use 256 KiB). Stay under
+// the negotiated value, never above 256 KiB, and assume a conservative size
+// when the browser doesn't report one.
+const DEFAULT_MAX_MESSAGE_BYTES = 64 * 1024;
+const HARD_MAX_MESSAGE_BYTES = 256 * 1024;
+
+export class MessageTooLargeError extends Error {
+  constructor() {
+    super("message too large for the data channel");
+    this.name = "MessageTooLargeError";
+  }
+}
+
+export function maxMessageBytes(pc: { sctp?: { maxMessageSize?: number } | null }): number {
+  const reported = pc.sctp?.maxMessageSize;
+  const negotiated = typeof reported === "number" && reported > 0 ? reported : DEFAULT_MAX_MESSAGE_BYTES;
+  return Math.min(negotiated, HARD_MAX_MESSAGE_BYTES);
+}
+
+// Throws if the UTF-8 encoded message would exceed the limit.
+export function assertFitsMessageLimit(json: string, limitBytes: number): void {
+  if (new TextEncoder().encode(json).length > limitBytes) throw new MessageTooLargeError();
+}
 const MAX_NAME_LENGTH = 255;
 const MAX_ID_LENGTH = 64;
 
@@ -47,6 +72,10 @@ export function parseControlMessage(raw: unknown): ControlMessage | null {
         mime: msg.mime.slice(0, 255),
       };
     case "file-accept":
+      if (!isShortString(msg.transferId, MAX_ID_LENGTH)) return null;
+      return msg.acks === true
+        ? { type: "file-accept", transferId: msg.transferId, acks: true }
+        : { type: "file-accept", transferId: msg.transferId };
     case "file-reject":
     case "file-cancel":
       if (!isShortString(msg.transferId, MAX_ID_LENGTH)) return null;

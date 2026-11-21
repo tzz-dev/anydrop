@@ -39,6 +39,7 @@ export interface Dictionary {
   transferCancel: string;
   transfersClear: string;
   textSendFailed: string;
+  textTooLong: string;
   connectionLost: string;
 }
 
@@ -79,6 +80,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     transferCancel: "取消",
     transfersClear: "清除已结束的传输",
     textSendFailed: "发送失败,请重试",
+    textTooLong: "文本太长,请缩短或分段发送",
     connectionLost: "与服务器的连接已断开,正在重连…",
   },
   en: {
@@ -117,6 +119,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     transferCancel: "Cancel",
     transfersClear: "Clear finished",
     textSendFailed: "Failed to send, please try again",
+    textTooLong: "Text is too long; shorten it or send it in parts",
     connectionLost: "Connection to the server was lost. Reconnecting…",
   },
   ja: {
@@ -155,6 +158,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
     transferCancel: "キャンセル",
     transfersClear: "完了した転送を消去",
     textSendFailed: "送信に失敗しました。もう一度お試しください",
+    textTooLong: "テキストが長すぎます。短くするか分けて送信してください",
     connectionLost: "サーバーとの接続が切れました。再接続中…",
   },
 };

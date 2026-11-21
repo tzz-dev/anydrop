@@ -4,6 +4,13 @@ const CHUNK_SIZE = 64 * 1024;
 const HIGH_WATERMARK = 4 * 1024 * 1024;
 const LOW_WATERMARK = 1024 * 1024;
 
+// Receivers that stream to disk acknowledge data once it is written. The
+// sender stops when this many bytes are unacknowledged, which bounds how much
+// a slow disk can make the receiver queue in memory.
+export const ACK_WINDOW_BYTES = 16 * 1024 * 1024;
+const ACK_INTERVAL_BYTES = 4 * 1024 * 1024;
+const ACK_PREFIX = "ack:";
+
 export class TransferAbortedError extends Error {
   constructor() {
     super("transfer aborted");
@@ -54,16 +61,91 @@ function waitForBufferedLow(channel: RTCDataChannel, signal?: AbortSignal): Prom
   });
 }
 
+export interface SendOptions {
+  // When set, never keep more than this many bytes unacknowledged by the
+  // receiver ("ack:<bytes>" messages on the channel).
+  ackWindowBytes?: number;
+}
+
+// Tracks the receiver's acknowledgements and lets the sender wait for room in
+// its window. Rejects when the channel closes or the transfer is aborted.
+function createAckTracker(channel: RTCDataChannel, signal?: AbortSignal) {
+  let acked = 0;
+  let wake: (() => void) | null = null;
+
+  const onMessage = (event: MessageEvent) => {
+    if (typeof event.data !== "string" || !event.data.startsWith(ACK_PREFIX)) return;
+    const value = Number(event.data.slice(ACK_PREFIX.length));
+    if (Number.isSafeInteger(value) && value > acked) {
+      acked = value;
+      wake?.();
+    }
+  };
+  channel.addEventListener("message", onMessage);
+
+  return {
+    waitForRoom(sent: number, windowBytes: number): Promise<void> {
+      return new Promise<void>((resolve, reject) => {
+        const check = () => {
+          if (signal?.aborted) return fail(new TransferAbortedError());
+          if (channel.readyState !== "open") return fail(new Error("data channel closed"));
+          if (sent - acked < windowBytes) return done();
+        };
+        const cleanup = () => {
+          wake = null;
+          channel.removeEventListener("close", check);
+          signal?.removeEventListener("abort", check);
+        };
+        const done = () => {
+          cleanup();
+          resolve();
+        };
+        const fail = (error: Error) => {
+          cleanup();
+          reject(error);
+        };
+        if (sent - acked < windowBytes) return resolve();
+        wake = check;
+        channel.addEventListener("close", check);
+        signal?.addEventListener("abort", check);
+        check();
+      });
+    },
+    dispose() {
+      channel.removeEventListener("message", onMessage);
+    },
+  };
+}
+
 export async function sendFile(
   channel: RTCDataChannel,
   file: File,
   onProgress: (sentBytes: number) => void,
   signal?: AbortSignal,
+  options: SendOptions = {},
+): Promise<void> {
+  const tracker = options.ackWindowBytes ? createAckTracker(channel, signal) : null;
+  try {
+    await sendChunks(channel, file, onProgress, signal, tracker, options.ackWindowBytes);
+  } finally {
+    tracker?.dispose();
+  }
+}
+
+async function sendChunks(
+  channel: RTCDataChannel,
+  file: File,
+  onProgress: (sentBytes: number) => void,
+  signal: AbortSignal | undefined,
+  tracker: ReturnType<typeof createAckTracker> | null,
+  ackWindowBytes: number | undefined,
 ): Promise<void> {
   let offset = 0;
   while (offset < file.size) {
     if (signal?.aborted) throw new TransferAbortedError();
     if (channel.readyState !== "open") throw new Error("data channel closed");
+
+    if (tracker && ackWindowBytes) await tracker.waitForRoom(offset, ackWindowBytes);
 
     if (channel.bufferedAmount > HIGH_WATERMARK) {
       channel.bufferedAmountLowThreshold = LOW_WATERMARK;
@@ -117,6 +199,19 @@ export function receiveFile(
   // The outcome (complete / error / abort) has been reported.
   let settled = false;
   let writeQueue: Promise<void> = Promise.resolve();
+  // Bytes confirmed written to the sink, and the last value we told the sender.
+  let written = 0;
+  let lastAcked = 0;
+
+  const acknowledge = () => {
+    if (receivingDone || written - lastAcked < ACK_INTERVAL_BYTES) return;
+    lastAcked = written;
+    try {
+      channel.send(`${ACK_PREFIX}${written}`);
+    } catch {
+      // Channel is going away; the close handler reports it.
+    }
+  };
 
   const detach = () => {
     channel.onmessage = null;
@@ -177,7 +272,12 @@ export function receiveFile(
     if (sink) {
       const chunk = event.data;
       writeQueue = writeQueue
-        .then(() => (settled ? undefined : sink.write(chunk)))
+        .then(async () => {
+          if (settled) return;
+          await sink.write(chunk);
+          written += chunk.byteLength;
+          acknowledge();
+        })
         .catch((error) => fail(`failed to write file: ${String(error)}`));
     } else {
       chunks.push(event.data);

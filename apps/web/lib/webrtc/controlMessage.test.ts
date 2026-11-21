@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseControlMessage } from "./controlMessage";
+import { assertFitsMessageLimit, MessageTooLargeError, maxMessageBytes, parseControlMessage } from "./controlMessage";
 
 const offer = (overrides: Record<string, unknown> = {}) =>
   JSON.stringify({ type: "file-offer", transferId: "t1", name: "a.txt", size: 10, mime: "text/plain", ...overrides });
@@ -50,5 +50,32 @@ describe("parseControlMessage", () => {
     expect(parseControlMessage(123)).toBeNull();
     expect(parseControlMessage("null")).toBeNull();
     expect(parseControlMessage(JSON.stringify({ type: "unknown" }))).toBeNull();
+  });
+});
+
+describe("file-accept acks flag", () => {
+  it("keeps acks only when it is exactly true", () => {
+    const accept = (extra: object) => parseControlMessage(JSON.stringify({ type: "file-accept", transferId: "t", ...extra }));
+    expect(accept({ acks: true })).toEqual({ type: "file-accept", transferId: "t", acks: true });
+    expect(accept({ acks: "yes" })).toEqual({ type: "file-accept", transferId: "t" });
+    expect(accept({})).toEqual({ type: "file-accept", transferId: "t" });
+  });
+});
+
+describe("message size limits", () => {
+  it("uses the negotiated size but never more than 256 KiB, with a safe default", () => {
+    expect(maxMessageBytes({ sctp: { maxMessageSize: 100_000 } })).toBe(100_000);
+    expect(maxMessageBytes({ sctp: { maxMessageSize: 1_073_741_823 } })).toBe(256 * 1024);
+    expect(maxMessageBytes({ sctp: { maxMessageSize: Infinity } })).toBe(256 * 1024);
+    expect(maxMessageBytes({ sctp: null })).toBe(64 * 1024);
+    expect(maxMessageBytes({})).toBe(64 * 1024);
+  });
+
+  it("measures encoded bytes, not characters", () => {
+    // 30k CJK characters are 90k bytes in UTF-8.
+    const cjk = JSON.stringify({ text: "字".repeat(30_000) });
+    expect(() => assertFitsMessageLimit(cjk, 64 * 1024)).toThrow(MessageTooLargeError);
+    expect(() => assertFitsMessageLimit(cjk, 128 * 1024)).not.toThrow();
+    expect(() => assertFitsMessageLimit("a".repeat(1000), 1000)).not.toThrow();
   });
 });

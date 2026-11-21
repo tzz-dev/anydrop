@@ -35,7 +35,9 @@ export type ServerSignalMessage =
 // JSON control messages exchanged over the per-peer "control" RTCDataChannel.
 export type ControlMessage =
   | { type: "file-offer"; transferId: string; name: string; size: number; mime: string }
-  | { type: "file-accept"; transferId: string }
+  // acks: the receiver streams to disk and will send "ack:<bytes>" on the file
+  // channel as data reaches the disk; the sender must not run too far ahead.
+  | { type: "file-accept"; transferId: string; acks?: boolean }
   | { type: "file-reject"; transferId: string }
   | { type: "file-cancel"; transferId: string }
   | { type: "text"; text: string; textId: string };

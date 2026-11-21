@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
+import { MessageTooLargeError } from "@/lib/webrtc/controlMessage";
 
 export interface ReceivedTextView {
   textId: string;
@@ -20,20 +21,20 @@ export default function TextSharePanel({
 }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState("");
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<"error" | "too-long" | null>(null);
   const [sending, setSending] = useState(false);
 
   const submit = async () => {
     const text = draft.trim();
     if (!text || sending) return;
     setSending(true);
-    setFailed(false);
+    setFailed(null);
     try {
       await onSend(text);
       // Only clear the draft once the message actually went out.
       setDraft("");
-    } catch {
-      setFailed(true);
+    } catch (error) {
+      setFailed(error instanceof MessageTooLargeError ? "too-long" : "error");
     } finally {
       setSending(false);
     }
@@ -46,7 +47,7 @@ export default function TextSharePanel({
           value={draft}
           onChange={(event) => {
             setDraft(event.target.value);
-            setFailed(false);
+            setFailed(null);
           }}
           disabled={disabled}
           placeholder={disabled ? t.textPlaceholderDisabled : t.textPlaceholder}
@@ -66,7 +67,7 @@ export default function TextSharePanel({
 
       {failed && (
         <p role="alert" className="text-xs text-red-500">
-          {t.textSendFailed}
+          {failed === "too-long" ? t.textTooLong : t.textSendFailed}
         </p>
       )}
 

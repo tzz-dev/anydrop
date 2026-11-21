@@ -11,8 +11,8 @@ import {
 } from "@anydrop/protocol";
 import { randomId } from "../id";
 import { throttleProgress } from "../throttle";
-import { parseControlMessage } from "./controlMessage";
-import { receiveFile, sendFile, TransferAbortedError, type FileSink, type IncomingFileTransfer } from "./fileTransfer";
+import { assertFitsMessageLimit, maxMessageBytes, parseControlMessage } from "./controlMessage";
+import { ACK_WINDOW_BYTES, receiveFile, sendFile, TransferAbortedError, type FileSink, type IncomingFileTransfer } from "./fileTransfer";
 
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
 
@@ -179,7 +179,11 @@ export class PeerManager {
     const entry = this.getOrCreatePeer(connectionId);
     const control = await this.ensureControl(connectionId, entry);
     const msg: ControlMessage = { type: "text", text, textId: randomId() };
-    control.send(JSON.stringify(msg));
+    const json = JSON.stringify(msg);
+    // Check the real encoded size: CJK text and JSON escaping are far larger
+    // than the character count, and oversized sends make the browser throw.
+    assertFitsMessageLimit(json, maxMessageBytes(entry.pc));
+    control.send(json);
   }
 
   // Returns false if the offer no longer exists (e.g. the sender canceled
@@ -193,7 +197,9 @@ export class PeerManager {
     }
     pending.accepted = true;
     pending.sink = sink;
-    this.sendControl(entry, { type: "file-accept", transferId });
+    // A sink means data is written to disk, which can lag behind the network:
+    // ask the sender to wait for our acknowledgements.
+    this.sendControl(entry, sink ? { type: "file-accept", transferId, acks: true } : { type: "file-accept", transferId });
     return true;
   }
 
@@ -441,7 +447,7 @@ export class PeerManager {
       case "file-accept": {
         const offer = entry.outgoing.get(msg.transferId);
         // Ignore duplicate accepts: only the first one starts a send.
-        if (offer && !entry.outgoingAbort.has(msg.transferId)) this.beginSending(entry, offer);
+        if (offer && !entry.outgoingAbort.has(msg.transferId)) this.beginSending(entry, offer, msg.acks === true);
         break;
       }
 
@@ -469,7 +475,7 @@ export class PeerManager {
     }
   }
 
-  private beginSending(entry: PeerEntry, offer: OutgoingFileOffer) {
+  private beginSending(entry: PeerEntry, offer: OutgoingFileOffer, receiverAcks: boolean) {
     const channel = entry.pc.createDataChannel(fileChannelLabel(offer.transferId));
     channel.binaryType = "arraybuffer";
     const abortController = new AbortController();
@@ -495,6 +501,7 @@ export class PeerManager {
         offer.file,
         reportProgress,
         abortController.signal,
+        receiverAcks ? { ackWindowBytes: ACK_WINDOW_BYTES } : undefined,
       )
         .then(() => {
           this.emit({ kind: "transfer-complete", transferId: offer.transferId, direction: "send" });

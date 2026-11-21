@@ -7,6 +7,7 @@ class FakeChannel {
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
   close = vi.fn();
+  send = vi.fn();
   push(bytes: number) {
     this.onmessage?.({ data: new ArrayBuffer(bytes) });
   }
@@ -174,5 +175,109 @@ describe("sendFile", () => {
     const file = new File([new Uint8Array(100)], "a.bin");
     await sendFile(channel as unknown as RTCDataChannel, file, () => {});
     expect(channel.sent).toEqual([100]);
+  });
+});
+
+describe("receiver acknowledgements (disk backpressure)", () => {
+  const MB = 1024 * 1024;
+
+  it("acknowledges data only once it is written, in batches", async () => {
+    const { sink } = fakeSink();
+    const { channel } = setup(100 * MB, sink);
+    for (let i = 0; i < 4; i++) channel.push(MB);
+    await flush();
+    expect(channel.send).toHaveBeenCalledWith(`ack:${4 * MB}`);
+    expect(channel.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds back acknowledgements while the disk is slow", async () => {
+    let finishWrite: () => void = () => {};
+    const slow = new Promise<void>((resolve) => (finishWrite = resolve));
+    const { sink } = fakeSink({ write: vi.fn(() => slow) });
+    const { channel } = setup(100 * MB, sink);
+    // A single chunk already reaches the acknowledgement interval.
+    channel.push(4 * MB);
+    await flush();
+    expect(channel.send).not.toHaveBeenCalled();
+
+    finishWrite();
+    await flush();
+    expect(channel.send).toHaveBeenCalled();
+  });
+
+  it("does not acknowledge when receiving into memory", async () => {
+    const { channel } = setup(100 * MB);
+    for (let i = 0; i < 8; i++) channel.push(MB);
+    await flush();
+    expect(channel.send).not.toHaveBeenCalled();
+  });
+});
+
+describe("sendFile with an acknowledgement window", () => {
+  class AckChannel {
+    readyState = "open";
+    bufferedAmount = 0;
+    bufferedAmountLowThreshold = 0;
+    sent = 0;
+    private listeners = new Map<string, Set<(event: unknown) => void>>();
+    addEventListener(type: string, fn: (event: unknown) => void) {
+      if (!this.listeners.has(type)) this.listeners.set(type, new Set());
+      this.listeners.get(type)!.add(fn);
+    }
+    removeEventListener(type: string, fn: (event: unknown) => void) {
+      this.listeners.get(type)?.delete(fn);
+    }
+    emit(type: string, event: unknown = {}) {
+      for (const fn of [...(this.listeners.get(type) ?? [])]) fn(event);
+    }
+    send(chunk: ArrayBuffer) {
+      this.sent += chunk.byteLength;
+    }
+  }
+
+  const KB = 1024;
+  const file = () => new File([new Uint8Array(512 * KB)], "a.bin");
+
+  it("stops at the window until the receiver acknowledges", async () => {
+    const channel = new AckChannel();
+    const done = sendFile(channel as unknown as RTCDataChannel, file(), () => {}, undefined, {
+      ackWindowBytes: 128 * KB,
+    });
+    await flush();
+    expect(channel.sent).toBe(128 * KB);
+
+    channel.emit("message", { data: `ack:${128 * KB}` });
+    await flush();
+    expect(channel.sent).toBe(256 * KB);
+
+    channel.emit("message", { data: `ack:${512 * KB}` });
+    await done;
+    expect(channel.sent).toBe(512 * KB);
+  });
+
+  it("fails instead of hanging when the channel closes while waiting", async () => {
+    const channel = new AckChannel();
+    const done = sendFile(channel as unknown as RTCDataChannel, file(), () => {}, undefined, {
+      ackWindowBytes: 64 * KB,
+    });
+    await flush();
+    channel.readyState = "closed";
+    channel.emit("close");
+    await expect(done).rejects.toThrow("data channel closed");
+  });
+
+  it("ignores malformed acknowledgements", async () => {
+    const channel = new AckChannel();
+    const done = sendFile(channel as unknown as RTCDataChannel, file(), () => {}, undefined, {
+      ackWindowBytes: 64 * KB,
+    });
+    await flush();
+    channel.emit("message", { data: "ack:not-a-number" });
+    channel.emit("message", { data: new ArrayBuffer(4) });
+    await flush();
+    expect(channel.sent).toBe(64 * KB);
+
+    channel.emit("message", { data: `ack:${512 * KB}` });
+    await done;
   });
 });

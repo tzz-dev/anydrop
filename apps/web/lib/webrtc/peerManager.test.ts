@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClientSignalMessage } from "@anydrop/protocol";
 import { PeerManager, type PeerManagerEvent } from "./peerManager";
+import { MessageTooLargeError } from "./controlMessage";
 
 class FakeChannel {
   binaryType = "blob";
@@ -164,6 +165,33 @@ describe("PeerManager incoming text", () => {
     vi.advanceTimersByTime(10_001);
     send("later");
     expect(events.filter((e) => e.kind === "incoming-text")).toHaveLength(11);
+  });
+});
+
+describe("PeerManager message size and acks", () => {
+  it("refuses to send text that exceeds the message limit", async () => {
+    const { manager } = setup();
+    const { control } = await connectPeer(manager);
+    control.readyState = "open";
+    await expect(manager.sendText("B", "字".repeat(30_000))).rejects.toBeInstanceOf(MessageTooLargeError);
+    expect(control.controlMessages().some((m) => m.type === "text")).toBe(false);
+
+    await manager.sendText("B", "short");
+    expect(control.controlMessages()).toContainEqual(expect.objectContaining({ type: "text", text: "short" }));
+  });
+
+  it("asks the sender for acknowledgements only when streaming to disk", async () => {
+    const { manager } = setup();
+    const { control } = await connectPeer(manager);
+    remoteSends(control, offerMessage("mem", 10));
+    remoteSends(control, offerMessage("disk", 10));
+
+    manager.acceptFileOffer("B", "mem");
+    manager.acceptFileOffer("B", "disk", { write: async () => {}, close: async () => {}, abort: async () => {} });
+
+    const accepts = control.controlMessages().filter((m) => m.type === "file-accept");
+    expect(accepts).toContainEqual({ type: "file-accept", transferId: "mem" });
+    expect(accepts).toContainEqual({ type: "file-accept", transferId: "disk", acks: true });
   });
 });
 
