@@ -4,6 +4,8 @@
   "main": "src/index.ts",
   // Required secret (not stored here): `wrangler secret put ROOM_SALT`.
   // For local dev copy .dev.vars.example to .dev.vars.
+  // Optional var ALLOWED_ORIGINS (comma-separated, e.g. "https://app.example.com")
+  // restricts which websites may open signaling sockets.
   "compatibility_date": "2026-07-01",
   "durable_objects": {
     "bindings": [

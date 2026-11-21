@@ -152,6 +152,21 @@ describe("PeerManager incoming files", () => {
   });
 });
 
+describe("PeerManager incoming text", () => {
+  it("drops texts from a peer that floods faster than the limit, then recovers", async () => {
+    const { manager, events } = setup();
+    const { control } = await connectPeer(manager);
+    const send = (id: string) => remoteSends(control, { type: "text", text: "hi", textId: id });
+
+    for (let i = 0; i < 15; i++) send(`a${i}`);
+    expect(events.filter((e) => e.kind === "incoming-text")).toHaveLength(10);
+
+    vi.advanceTimersByTime(10_001);
+    send("later");
+    expect(events.filter((e) => e.kind === "incoming-text")).toHaveLength(11);
+  });
+});
+
 describe("PeerManager outgoing files", () => {
   it("does not start sending if the offer was canceled before the peer accepted", async () => {
     const { manager } = setup();

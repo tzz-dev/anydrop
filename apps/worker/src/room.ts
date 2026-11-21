@@ -2,6 +2,7 @@ import { Server, type Connection, type ConnectionContext, type WSMessage } from 
 import type { PeerInfo, ServerSignalMessage } from "@anydrop/protocol";
 import type { Env } from "./env";
 import { parseClientMessage } from "./messages";
+import { RateLimiter } from "./rate-limit";
 import { clientIp, verifyRoomId } from "./room-id";
 
 interface PeerConnectionState {
@@ -9,7 +10,16 @@ interface PeerConnectionState {
   displayName: string;
 }
 
+// A room is one network's worth of devices; far more than this is abuse.
+const MAX_CONNECTIONS_PER_ROOM = 64;
+// Signaling is a handful of messages per connection attempt.
+const MESSAGE_LIMIT = 100;
+const MESSAGE_WINDOW_MS = 10_000;
+
 export class AnydropRoom extends Server<Env> {
+  // In-memory only; a reset on eviction just gives the connection a fresh budget.
+  private limiters = new Map<string, RateLimiter>();
+
   async onConnect(connection: Connection<PeerConnectionState>, ctx: ConnectionContext) {
     // Defense in depth: reject anyone who connected straight to a guessed
     // room id instead of going through the Worker's IP-based routing in index.ts.
@@ -17,6 +27,11 @@ export class AnydropRoom extends Server<Env> {
     const isExpectedRoom = await verifyRoomId(ip, this.env.ROOM_SALT, this.name);
     if (!isExpectedRoom) {
       connection.close(4001, "room mismatch");
+      return;
+    }
+
+    if ([...this.getConnections()].length > MAX_CONNECTIONS_PER_ROOM) {
+      connection.close(4002, "room full");
       return;
     }
 
@@ -30,6 +45,16 @@ export class AnydropRoom extends Server<Env> {
 
   onMessage(connection: Connection<PeerConnectionState>, message: WSMessage) {
     if (typeof message !== "string") return;
+
+    let limiter = this.limiters.get(connection.id);
+    if (!limiter) {
+      limiter = new RateLimiter(MESSAGE_LIMIT, MESSAGE_WINDOW_MS);
+      this.limiters.set(connection.id, limiter);
+    }
+    if (!limiter.allow()) {
+      connection.close(4008, "rate limit exceeded");
+      return;
+    }
 
     const msg = parseClientMessage(message);
     if (!msg) return;
@@ -59,7 +84,8 @@ export class AnydropRoom extends Server<Env> {
     }
   }
 
-  onClose() {
+  onClose(connection: Connection) {
+    this.limiters.delete(connection.id);
     this.broadcastRoster();
   }
 

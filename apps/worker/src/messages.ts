@@ -4,6 +4,20 @@ import type { ClientSignalMessage } from "@anydrop/protocol";
 // either a bug or abuse.
 export const MAX_MESSAGE_CHARS = 64 * 1024;
 
+const MAX_ID_CHARS = 64;
+const MAX_DISPLAY_NAME_CHARS = 32;
+
+// Names are shown to every device in the room, so strip control/bidi
+// characters and cap the length. Returns null if nothing printable is left.
+export function sanitizeDisplayName(name: string): string | null {
+  const cleaned = name
+    .replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const limited = Array.from(cleaned).slice(0, MAX_DISPLAY_NAME_CHARS).join("").trim();
+  return limited === "" ? null : limited;
+}
+
 const SDP_TYPES = new Set(["offer", "answer", "pranswer", "rollback"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -27,11 +41,14 @@ export function parseClientMessage(raw: string): ClientSignalMessage | null {
   switch (value.type) {
     case "hello":
       if (typeof value.peerId !== "string" || typeof value.displayName !== "string") return null;
-      return { type: "hello", peerId: value.peerId, displayName: value.displayName };
+      if (value.peerId === "" || value.peerId.length > MAX_ID_CHARS) return null;
+      const displayName = sanitizeDisplayName(value.displayName);
+      if (!displayName) return null;
+      return { type: "hello", peerId: value.peerId, displayName };
 
     case "signal": {
       const data = value.data;
-      if (typeof value.to !== "string" || !isRecord(data)) return null;
+      if (typeof value.to !== "string" || value.to.length > MAX_ID_CHARS || !isRecord(data)) return null;
       if (typeof data.type !== "string" || !SDP_TYPES.has(data.type)) return null;
       if (data.sdp !== undefined && typeof data.sdp !== "string") return null;
       return value as ClientSignalMessage;
@@ -39,7 +56,7 @@ export function parseClientMessage(raw: string): ClientSignalMessage | null {
 
     case "ice": {
       const data = value.data;
-      if (typeof value.to !== "string" || !isRecord(data)) return null;
+      if (typeof value.to !== "string" || value.to.length > MAX_ID_CHARS || !isRecord(data)) return null;
       if (typeof data.candidate !== "string") return null;
       return value as ClientSignalMessage;
     }

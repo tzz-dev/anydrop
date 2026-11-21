@@ -71,12 +71,18 @@ interface PendingIncomingOffer {
   sink?: FileSink;
 }
 
+// A stranger on the same network can message us unprompted; cap how fast
+// texts from one peer are surfaced so they cannot flood the UI.
+const MAX_TEXTS_PER_WINDOW = 10;
+const TEXT_WINDOW_MS = 10_000;
+
 interface PeerEntry {
   connectionId: string;
   pc: RTCPeerConnection;
   // The peer is no longer in the room roster but still has a transfer running.
   orphaned: boolean;
   releaseTimer?: ReturnType<typeof setTimeout>;
+  textTimes: number[];
   makingOffer: boolean;
   ignoreOffer: boolean;
   // Serializes remote signaling/ICE handling so candidates are never added
@@ -271,6 +277,7 @@ export class PeerManager {
       ignoreOffer: false,
       signalQueue: Promise.resolve(),
       controlReady: null,
+      textTimes: [],
       outgoing: new Map(),
       incoming: new Map(),
       outgoingAbort: new Map(),
@@ -451,9 +458,14 @@ export class PeerManager {
         this.scheduleOrphanRelease(entry);
         break;
 
-      case "text":
+      case "text": {
+        const now = Date.now();
+        entry.textTimes = entry.textTimes.filter((time) => now - time < TEXT_WINDOW_MS);
+        if (entry.textTimes.length >= MAX_TEXTS_PER_WINDOW) break;
+        entry.textTimes.push(now);
         this.emit({ kind: "incoming-text", connectionId, text: msg.text, textId: msg.textId });
         break;
+      }
     }
   }
 

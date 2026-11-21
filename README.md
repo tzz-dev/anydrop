@@ -52,6 +52,7 @@ Open the page in two tabs (each tab is its own device) to try it out.
 | Name | Description |
 | --- | --- |
 | `ROOM_SALT` | Secret used to hash IPs into room ids. Locally: `apps/worker/.dev.vars`. In production: `wrangler secret put ROOM_SALT`. The Worker refuses requests (HTTP 500) if it is missing. |
+| `ALLOWED_ORIGINS` | Optional comma-separated list of exact origins (e.g. `https://anydrop.example.com`). When set, only browsers on those origins can open signaling sockets (others get HTTP 403). Set it as a `vars` entry in `wrangler.jsonc`. |
 
 ## Deployment
 
@@ -71,5 +72,8 @@ pnpm deploy
   Chrome/Edge) files of 256 MB or more are streamed straight to a file you pick instead; in other
   browsers files over 512 MB are refused up front, since they would not fit in memory.
 - Text messages are delivered without a confirmation prompt, and device names are
-  self-reported, so anyone sharing your room can send you text and pick any name.
+  self-reported (the Worker only strips control characters and caps them at 32 characters), so
+  anyone sharing your room can send you text and pick any name. Per-connection signaling rate
+  limits (100 messages / 10 s), a 64-device room cap, and a receiver-side limit of 10 texts / 10 s
+  per device bound abuse but do not prevent it.
 - Without a TURN server, some networks (e.g. symmetric NAT) can't establish a direct connection.

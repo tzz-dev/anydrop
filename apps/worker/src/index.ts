@@ -1,5 +1,6 @@
 import { getServerByName } from "partyserver";
 import type { Env } from "./env";
+import { isOriginAllowed } from "./origin";
 import { clientIp, hashIpToRoomId } from "./room-id";
 
 export { AnydropRoom } from "./room";
@@ -16,6 +17,10 @@ export default {
     const url = new URL(request.url);
     if (url.pathname !== "/connect") {
       return new Response("Not Found", { status: 404 });
+    }
+
+    if (!isOriginAllowed(request.headers.get("Origin"), env.ALLOWED_ORIGINS)) {
+      return new Response("Forbidden", { status: 403 });
     }
 
     // Ignore any room name the client put in the URL — the room is always
