@@ -1,1 +1,4 @@
 ROOM_SALT=local-dev-salt-change-me
+
+# Allow any origin during local development (production restricts it in wrangler.jsonc).
+ALLOWED_ORIGINS=
