@@ -5,6 +5,7 @@ import { useRoom } from "@/lib/useRoom";
 import { PeerManager, type PeerManagerEvent } from "@/lib/webrtc/peerManager";
 import { getIdentity, type Identity } from "@/lib/identity";
 import { downloadBlob } from "@/lib/download";
+import { randomId } from "@/lib/id";
 import { canReceiveSize, pickFileSink, shouldStreamToDisk } from "@/lib/saveFile";
 import type { FileSink } from "@/lib/webrtc/fileTransfer";
 import { useI18n } from "@/lib/i18n/context";
@@ -122,10 +123,6 @@ export default function Page() {
       ),
   );
 
-  useEffect(() => {
-    peerManager.setLocalConnectionId(room.connectionId);
-  }, [room.connectionId, peerManager]);
-
   // Close WebRTC connections (and fail their transfers) for peers that left.
   useEffect(() => {
     peerManager.syncPeers(room.peers.map((peer) => peer.connectionId));
@@ -150,7 +147,7 @@ export default function Page() {
       files.map(async (file) => {
         // Register the transfer before connecting so it shows up immediately
         // and can be marked failed if the peer never becomes reachable.
-        const transferId = crypto.randomUUID();
+        const transferId = randomId();
         setTransfers((prev) => ({
           ...prev,
           [transferId]: {
@@ -187,7 +184,6 @@ export default function Page() {
   };
 
   const acceptOffer = async (offer: IncomingOffer) => {
-
     // Big files are streamed to a user-chosen file instead of buffered in
     // memory. The save dialog must open straight from this click, so it
     // happens before anything else; dismissing it keeps the offer pending.

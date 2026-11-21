@@ -9,6 +9,8 @@ import {
   type RTCSessionDescriptionLike,
   type ServerSignalMessage,
 } from "@anydrop/protocol";
+import { randomId } from "../id";
+import { throttleProgress } from "../throttle";
 import { parseControlMessage } from "./controlMessage";
 import { receiveFile, sendFile, TransferAbortedError, type FileSink, type IncomingFileTransfer } from "./fileTransfer";
 
@@ -34,6 +36,10 @@ const ICE_SERVERS = loadIceServers();
 
 const CONTROL_OPEN_TIMEOUT_MS = 15_000;
 const MAX_PENDING_OFFERS_PER_PEER = 10;
+// A peer that dropped out of the room while a transfer was running keeps its
+// connection until the transfer ends, plus this grace period so the tail of
+// the data isn't cut off by closing the connection right after the last byte.
+const ORPHAN_GRACE_MS = 5_000;
 
 export type PeerManagerEvent =
   | { kind: "incoming-file-offer"; connectionId: string; transferId: string; name: string; size: number; mime: string }
@@ -66,9 +72,11 @@ interface PendingIncomingOffer {
 }
 
 interface PeerEntry {
+  connectionId: string;
   pc: RTCPeerConnection;
-  // Perfect-negotiation role: the polite side yields on offer collisions.
-  polite: boolean;
+  // The peer is no longer in the room roster but still has a transfer running.
+  orphaned: boolean;
+  releaseTimer?: ReturnType<typeof setTimeout>;
   makingOffer: boolean;
   ignoreOffer: boolean;
   // Serializes remote signaling/ICE handling so candidates are never added
@@ -91,14 +99,10 @@ export class PeerManager {
     private emit: (event: PeerManagerEvent) => void,
   ) {}
 
-  // Our own signaling connection id; used only to pick the polite/impolite
-  // role per peer pair (both sides compare the same two ids, so they agree).
-  setLocalConnectionId(id: string | null) {
-    this.localConnectionId = id;
-  }
-
   handleServerMessage(msg: ServerSignalMessage) {
-    if (msg.type === "signal") {
+    if (msg.type === "welcome") {
+      this.localConnectionId = msg.connectionId;
+    } else if (msg.type === "signal") {
       this.enqueueSignal(msg.from, (entry) => this.handleSignal(msg.from, entry, msg.data));
     } else if (msg.type === "ice") {
       this.enqueueSignal(msg.from, (entry) => this.handleIce(entry, msg.data), false);
@@ -106,11 +110,43 @@ export class PeerManager {
   }
 
   // Closes connections to peers that are no longer in the room roster.
+  //
+  // Dropping out of the roster only means the peer's *signaling* socket went
+  // away (a closed tab, but also a brief network blip). The peer-to-peer link
+  // doesn't depend on it, so a peer with a transfer in flight is kept until
+  // that transfer ends; if the peer is really gone, its connection fails on
+  // its own and cleans up through the usual paths.
   syncPeers(activeConnectionIds: Iterable<string>) {
     const active = new Set(activeConnectionIds);
-    for (const connectionId of [...this.peers.keys()]) {
-      if (!active.has(connectionId)) this.dropPeer(connectionId, "peer left the room");
+    for (const [connectionId, entry] of [...this.peers]) {
+      if (active.has(connectionId)) {
+        entry.orphaned = false;
+        clearTimeout(entry.releaseTimer);
+        entry.releaseTimer = undefined;
+      } else if (this.hasActiveTransfers(entry)) {
+        entry.orphaned = true;
+      } else {
+        this.dropPeer(connectionId, "peer left the room");
+      }
     }
+  }
+
+  // Data is flowing, or about to (an accepted offer whose channel hasn't opened yet).
+  private hasActiveTransfers(entry: PeerEntry): boolean {
+    if (entry.outgoingAbort.size > 0 || entry.incomingTransfer.size > 0) return true;
+    for (const offer of entry.incoming.values()) if (offer.accepted) return true;
+    return false;
+  }
+
+  // Called whenever a transfer ends: an orphaned peer is released shortly after.
+  private scheduleOrphanRelease(entry: PeerEntry) {
+    if (!entry.orphaned || entry.releaseTimer || this.hasActiveTransfers(entry)) return;
+    entry.releaseTimer = setTimeout(() => {
+      entry.releaseTimer = undefined;
+      if (entry.orphaned && !this.hasActiveTransfers(entry) && this.peers.get(entry.connectionId) === entry) {
+        this.dropPeer(entry.connectionId, "peer left the room");
+      }
+    }, ORPHAN_GRACE_MS);
   }
 
   async offerFile(connectionId: string, file: File, transferId: string): Promise<void> {
@@ -136,7 +172,7 @@ export class PeerManager {
   async sendText(connectionId: string, text: string): Promise<void> {
     const entry = this.getOrCreatePeer(connectionId);
     const control = await this.ensureControl(connectionId, entry);
-    const msg: ControlMessage = { type: "text", text, textId: crypto.randomUUID() };
+    const msg: ControlMessage = { type: "text", text, textId: randomId() };
     control.send(JSON.stringify(msg));
   }
 
@@ -174,6 +210,7 @@ export class PeerManager {
 
     this.sendControl(entry, { type: "file-cancel", transferId });
     this.emit({ kind: "transfer-canceled", transferId });
+    this.scheduleOrphanRelease(entry);
   }
 
   closeAll() {
@@ -198,6 +235,7 @@ export class PeerManager {
     const entry = this.peers.get(connectionId);
     if (!entry) return;
     this.peers.delete(connectionId);
+    clearTimeout(entry.releaseTimer);
 
     const transferIds = new Set<string>([
       ...entry.outgoing.keys(),
@@ -226,8 +264,9 @@ export class PeerManager {
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     const entry: PeerEntry = {
+      connectionId,
       pc,
-      polite: (this.localConnectionId ?? "") > connectionId,
+      orphaned: false,
       makingOffer: false,
       ignoreOffer: false,
       signalQueue: Promise.resolve(),
@@ -406,6 +445,7 @@ export class PeerManager {
         entry.outgoingAbort.get(msg.transferId)?.abort();
         this.discardIncoming(entry, msg.transferId);
         this.emit({ kind: "transfer-canceled", transferId: msg.transferId });
+        this.scheduleOrphanRelease(entry);
         break;
 
       case "text":
@@ -424,16 +464,21 @@ export class PeerManager {
       entry.outgoing.delete(offer.transferId);
       entry.outgoingAbort.delete(offer.transferId);
       if (channel.readyState !== "closed") channel.close();
+      this.scheduleOrphanRelease(entry);
     };
 
     let opened = false;
+    // One state update per 64 KB chunk would flood React; ~10 per second is plenty.
+    const reportProgress = throttleProgress((sentBytes) =>
+      this.emit({ kind: "send-progress", transferId: offer.transferId, sentBytes, totalBytes: offer.file.size }),
+    );
 
     channel.onopen = () => {
       opened = true;
       sendFile(
         channel,
         offer.file,
-        (sentBytes) => this.emit({ kind: "send-progress", transferId: offer.transferId, sentBytes, totalBytes: offer.file.size }),
+        reportProgress,
         abortController.signal,
       )
         .then(() => {
@@ -471,11 +516,15 @@ export class PeerManager {
       return;
     }
 
+    const reportProgress = throttleProgress((receivedBytes) =>
+      this.emit({ kind: "receive-progress", transferId, receivedBytes, totalBytes: pending.size }),
+    );
+
     const transfer = receiveFile(
       channel,
       pending.size,
       pending.mime,
-      (receivedBytes) => this.emit({ kind: "receive-progress", transferId, receivedBytes, totalBytes: pending.size }),
+      reportProgress,
       (blob) => {
         entry.incoming.delete(transferId);
         entry.incomingTransfer.delete(transferId);
@@ -488,11 +537,13 @@ export class PeerManager {
           name: pending.name,
           mime: pending.mime,
         });
+        this.scheduleOrphanRelease(entry);
       },
       (message) => {
         entry.incoming.delete(transferId);
         entry.incomingTransfer.delete(transferId);
         this.emit({ kind: "transfer-error", transferId, message });
+        this.scheduleOrphanRelease(entry);
       },
       pending.sink,
     );
@@ -517,7 +568,7 @@ export class PeerManager {
     // Perfect negotiation: on collision the impolite side ignores the remote
     // offer; the polite side rolls back (implicitly, via setRemoteDescription).
     const offerCollision = data.type === "offer" && (entry.makingOffer || pc.signalingState !== "stable");
-    entry.ignoreOffer = !entry.polite && offerCollision;
+    entry.ignoreOffer = !this.isPolite(connectionId) && offerCollision;
     if (entry.ignoreOffer) return;
 
     await pc.setRemoteDescription(data as RTCSessionDescriptionInit);
@@ -530,6 +581,13 @@ export class PeerManager {
         data: pc.localDescription!.toJSON() as RTCSessionDescriptionLike,
       });
     }
+  }
+
+  // Both sides compare the same pair of connection ids, so exactly one of them
+  // is polite. Evaluated when needed (not cached) so a reconnect that changes
+  // our id can never leave a stale role behind.
+  private isPolite(remoteConnectionId: string): boolean {
+    return this.localConnectionId !== null && this.localConnectionId > remoteConnectionId;
   }
 
   private async handleIce(entry: PeerEntry, data: RTCIceCandidateLike) {

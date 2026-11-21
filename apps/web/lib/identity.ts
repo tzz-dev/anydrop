@@ -1,3 +1,5 @@
+import { randomId } from "./id";
+
 const STORAGE_KEY = "anydrop:identity";
 
 export interface Identity {
@@ -21,7 +23,7 @@ function randomFrom<T>(list: T[]): T {
 
 function generateIdentity(): Identity {
   return {
-    peerId: crypto.randomUUID(),
+    peerId: randomId(),
     displayName: `${randomFrom(ADJECTIVES)} ${randomFrom(NOUNS)}`,
   };
 }

@@ -53,9 +53,10 @@ export function useRoom(identity: Identity | null): RoomHandle {
     const socket = new ReconnectingWebSocket(`${SIGNAL_URL}/connect`);
     socketRef.current = socket;
 
-    // The roster is intentionally kept while disconnected: existing WebRTC
-    // links don't depend on the signaling socket, so transfers in flight
-    // survive a blip. It is refreshed as soon as the socket reconnects.
+    // The roster is intentionally kept while disconnected so the list doesn't
+    // flicker; it is refreshed as soon as the socket reconnects. (Peers that
+    // see us drop out of the room keep any in-flight transfer alive, see
+    // PeerManager.syncPeers.)
     socket.addEventListener("open", () => setStatus("connected"));
     socket.addEventListener("close", () => setStatus("disconnected"));
 
@@ -72,6 +73,9 @@ export function useRoom(identity: Identity | null): RoomHandle {
             displayName: identity.displayName,
           };
           socket.send(JSON.stringify(hello));
+          // Listeners (the PeerManager) need our connection id synchronously:
+          // it decides the polite/impolite role during offer collisions.
+          for (const listener of listenersRef.current) listener(msg);
           break;
         }
         case "roster":
