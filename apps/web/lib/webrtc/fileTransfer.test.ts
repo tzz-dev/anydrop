@@ -108,6 +108,27 @@ describe("receiveFile with a sink (streaming to disk)", () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalledWith(null);
     expect(onError).not.toHaveBeenCalled();
+    // The sender is told the file is saved, then the channel is released.
+    expect(channel.send).toHaveBeenCalledWith("done");
+    expect(channel.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the channel open until the file is closed, and tells the sender when saving fails", async () => {
+    let failClose: (error: Error) => void = () => {};
+    const closing = new Promise<void>((_, reject) => (failClose = reject));
+    const { sink } = fakeSink({ close: vi.fn(() => closing) });
+    const { channel, onComplete, onError } = setup(10, sink);
+    channel.push(10);
+    await flush();
+    expect(channel.close).not.toHaveBeenCalled();
+    expect(channel.send).not.toHaveBeenCalledWith("done");
+
+    failClose(new Error("disk full"));
+    await flush();
+    expect(channel.send).toHaveBeenCalledWith("fail");
+    expect(channel.send).not.toHaveBeenCalledWith("done");
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
   it("fails and aborts the sink when a write fails", async () => {
@@ -118,6 +139,7 @@ describe("receiveFile with a sink (streaming to disk)", () => {
 
     expect(onError).toHaveBeenCalledTimes(1);
     expect(sink.abort).toHaveBeenCalled();
+    expect(channel.send).toHaveBeenCalledWith("fail");
     expect(onComplete).not.toHaveBeenCalled();
   });
 
@@ -251,7 +273,43 @@ describe("sendFile with an acknowledgement window", () => {
     expect(channel.sent).toBe(256 * KB);
 
     channel.emit("message", { data: `ack:${512 * KB}` });
+    await flush();
+    // Everything is sent, but success waits for the receiver's verdict.
+    let settled = false;
+    void done.then(() => (settled = true));
+    await flush();
+    expect(settled).toBe(false);
+
+    channel.emit("message", { data: "done" });
     await done;
+    expect(channel.sent).toBe(512 * KB);
+  });
+
+  it("fails when the receiver reports it could not save the file", async () => {
+    const channel = new AckChannel();
+    const done = sendFile(channel as unknown as RTCDataChannel, file(), () => {}, undefined, {
+      ackWindowBytes: 1024 * KB,
+    });
+    await flush();
+    expect(channel.sent).toBe(512 * KB);
+    channel.emit("message", { data: "fail" });
+    await expect(done).rejects.toThrow("receiver failed to save the file");
+  });
+
+  it("fails if the channel closes before the receiver confirms", async () => {
+    const channel = new AckChannel();
+    const done = sendFile(channel as unknown as RTCDataChannel, file(), () => {}, undefined, {
+      ackWindowBytes: 1024 * KB,
+    });
+    await flush();
+    channel.readyState = "closed";
+    channel.emit("close");
+    await expect(done).rejects.toThrow("data channel closed");
+  });
+
+  it("does not wait for a verdict from receivers that do not send acks", async () => {
+    const channel = new AckChannel();
+    await sendFile(channel as unknown as RTCDataChannel, file(), () => {});
     expect(channel.sent).toBe(512 * KB);
   });
 
@@ -278,6 +336,7 @@ describe("sendFile with an acknowledgement window", () => {
     expect(channel.sent).toBe(64 * KB);
 
     channel.emit("message", { data: `ack:${512 * KB}` });
+    channel.emit("message", { data: "done" });
     await done;
   });
 });
