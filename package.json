@@ -10,7 +10,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "packageManager": "pnpm@11.22.0",
   "devDependencies": {
     "concurrently": "^10.0.7"

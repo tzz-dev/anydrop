@@ -1,5 +1,7 @@
 # anydrop
 
+English | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
+
 AirDrop-style file and text sharing between devices on the same network, in the browser.
 Files and text go directly between devices over WebRTC; a small signaling server only
 helps them find each other and set up the connection.
@@ -77,3 +79,7 @@ pnpm deploy
   limits (100 messages / 10 s), a 64-device room cap, and a receiver-side limit of 10 texts / 10 s
   per device bound abuse but do not prevent it.
 - Without a TURN server, some networks (e.g. symmetric NAT) can't establish a direct connection.
+
+## License
+
+[MIT](LICENSE)
