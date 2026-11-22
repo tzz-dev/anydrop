@@ -66,3 +66,29 @@ export function getIdentity(): Identity {
   }
   return cached;
 }
+
+export const MAX_DISPLAY_NAME_LENGTH = 32;
+
+const listeners = new Set<() => void>();
+
+export function subscribeIdentity(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+// Returns the new name, or null if it was empty after trimming.
+export function renameIdentity(name: string): string | null {
+  const next = Array.from(name.replace(/\s+/g, " ").trim()).slice(0, MAX_DISPLAY_NAME_LENGTH).join("");
+  if (!next) return null;
+  const current = getIdentity();
+  if (current.displayName === next) return next;
+
+  cached = { peerId: current.peerId, displayName: next };
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(cached));
+  } catch {
+    // best-effort, like the initial save
+  }
+  for (const listener of listeners) listener();
+  return next;
+}

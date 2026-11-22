@@ -36,7 +36,7 @@ function getSnapshot(): Locale {
 }
 
 function getServerSnapshot(): Locale {
-  return "ja";
+  return "en";
 }
 
 function commitLocale(next: Locale) {

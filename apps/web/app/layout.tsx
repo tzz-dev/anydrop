@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "anydrop",
-  description: "Airdrop 风格的同网络文件与文本分享",
+  description: "AirDrop-style file and text sharing between devices on the same network",
 };
 
 export default function RootLayout({

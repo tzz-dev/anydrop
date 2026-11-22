@@ -49,9 +49,18 @@ export function useRoom(identity: Identity | null): RoomHandle {
   const [status, setStatus] = useState<RoomStatus>("connecting");
   const socketRef = useRef<ReconnectingWebSocket | null>(null);
   const listenersRef = useRef(new Set<ServerMessageListener>());
+  // Renaming must not drop the connection: only the peerId keys the effect,
+  // the current name is read from the ref (and re-announced by the effect below).
+  const identityRef = useRef(identity);
+  const peerId = identity?.peerId;
+  const displayName = identity?.displayName;
 
   useEffect(() => {
-    if (!identity) return;
+    identityRef.current = identity;
+  }, [identity]);
+
+  useEffect(() => {
+    if (!peerId) return;
     if (!SIGNAL_URL) {
       console.error("NEXT_PUBLIC_SIGNAL_URL is not set; cannot connect to the signaling server");
       return;
@@ -93,8 +102,8 @@ export function useRoom(identity: Identity | null): RoomHandle {
           setConnectionId(msg.connectionId);
           const hello: ClientSignalMessage = {
             type: "hello",
-            peerId: identity.peerId,
-            displayName: identity.displayName,
+            peerId,
+            displayName: identityRef.current?.displayName ?? "",
           };
           socket.send(JSON.stringify(hello));
           // Listeners (the PeerManager) need our connection id synchronously:
@@ -103,7 +112,7 @@ export function useRoom(identity: Identity | null): RoomHandle {
           break;
         }
         case "roster":
-          setPeers(msg.peers.filter((peer) => peer.peerId !== identity.peerId));
+          setPeers(msg.peers.filter((peer) => peer.peerId !== peerId));
           break;
         default:
           for (const listener of listenersRef.current) listener(msg);
@@ -118,7 +127,15 @@ export function useRoom(identity: Identity | null): RoomHandle {
       setPeers([]);
       setStatus("connecting");
     };
-  }, [identity]);
+  }, [peerId]);
+
+  // Tell the room about a new name (the server just updates our roster entry).
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!peerId || !displayName || !socket || socket.readyState !== SOCKET_OPEN) return;
+    const hello: ClientSignalMessage = { type: "hello", peerId, displayName };
+    socket.send(JSON.stringify(hello));
+  }, [peerId, displayName]);
 
   const send = useMemo(
     () => (msg: ClientSignalMessage) => socketRef.current?.send(JSON.stringify(msg)),
