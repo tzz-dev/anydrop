@@ -15,9 +15,9 @@ import PeerList from "@/components/PeerList";
 import DropZone from "@/components/DropZone";
 import IncomingTransferDialog, { type IncomingOffer } from "@/components/IncomingTransferDialog";
 import TransferProgress, { type TransferView } from "@/components/TransferProgress";
-import TextSharePanel from "@/components/TextSharePanel";
+import TextSharePanel, { type StagedText } from "@/components/TextSharePanel";
 import ReceivedTexts, { type ReceivedTextView } from "@/components/ReceivedTexts";
-import SendPanel from "@/components/SendPanel";
+import SendPanel, { type SendTab } from "@/components/SendPanel";
 import DeviceName from "@/components/DeviceName";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import PrivateRoomPanel from "@/components/PrivateRoomPanel";
@@ -198,6 +198,9 @@ export default function Page() {
     );
   };
 
+  const [sendTab, setSendTab] = useState<SendTab>("file");
+  const [stagedText, setStagedText] = useState<StagedText | null>(null);
+
   // Files can be dropped anywhere on the page or pasted from the clipboard.
   const handleFilesRef = useRef(handleFiles);
   useEffect(() => {
@@ -224,9 +227,22 @@ export default function Page() {
     };
     const onPaste = (event: ClipboardEvent) => {
       const files = Array.from(event.clipboardData?.files ?? []);
-      if (files.length === 0) return;
+      if (files.length > 0) {
+        event.preventDefault();
+        void handleFilesRef.current(files);
+        return;
+      }
+      // Pasting text outside an input stages it in the text box. Pasting into
+      // an input keeps its normal behavior.
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) {
+        return;
+      }
+      const text = event.clipboardData?.getData("text/plain") ?? "";
+      if (!text.trim()) return;
       event.preventDefault();
-      void handleFilesRef.current(files);
+      setSendTab("text");
+      setStagedText({ text, nonce: Date.now() });
     };
     window.addEventListener("dragover", onDragOver);
     window.addEventListener("dragleave", onDragLeave);
@@ -373,8 +389,10 @@ export default function Page() {
 
       <SendPanel
         peerName={selectedPeer?.displayName ?? null}
+        tab={sendTab}
+        onTabChange={setSendTab}
         fileTab={<DropZone disabled={!effectiveSelectedConnectionId} dragging={pageDragging} onFiles={handleFiles} />}
-        textTab={<TextSharePanel disabled={!effectiveSelectedConnectionId} onSend={handleSendText} />}
+        textTab={<TextSharePanel disabled={!effectiveSelectedConnectionId} staged={stagedText} onSend={handleSendText} />}
       />
 
       <ReceivedTexts texts={receivedTexts} onDelete={handleDeleteText} />

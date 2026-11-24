@@ -4,17 +4,29 @@ import { useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { MessageTooLargeError } from "@/lib/webrtc/controlMessage";
 
+export type StagedText = { text: string; nonce: number };
+
 export default function TextSharePanel({
   disabled,
+  staged,
   onSend,
 }: {
   disabled: boolean;
+  /** Text pasted elsewhere on the page; each new nonce is added to the draft once. */
+  staged: StagedText | null;
   onSend: (text: string) => Promise<void>;
 }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState("");
   const [failed, setFailed] = useState<"error" | "too-long" | null>(null);
   const [sending, setSending] = useState(false);
+  const [appliedNonce, setAppliedNonce] = useState<number | null>(null);
+
+  if (staged && staged.nonce !== appliedNonce) {
+    setAppliedNonce(staged.nonce);
+    setDraft(draft ? `${draft}\n${staged.text}` : staged.text);
+    setFailed(null);
+  }
 
   const submit = async () => {
     const text = draft.trim();
