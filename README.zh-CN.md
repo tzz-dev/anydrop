@@ -10,6 +10,10 @@
 - **房间由公网 IP 决定。** 信令 Worker 用保密的盐值对调用方的 IP（IPv6 取 /64 前缀）做哈希，
   以此选出一个 Durable Object 房间，所以连着同一个路由器的设备会自动碰面。这只是一种启发式做法：
   处于运营商级 NAT（CGNAT）、公司代理或 VPN 之后的设备，可能会和陌生人处在同一个房间。
+- **私密房间。** 设备也可以创建私密房间：一个随机房间码（放在页面 URL 的 `#room=CODE` 片段里，
+  浏览器不会把它发给任何服务器），任何拿到链接或二维码的人都能从任意网络加入。私密房间里的设备
+  不在"附近设备"房间中，所以同一网络下的陌生人看不到它们。连接时房间码会以 `?room=` 的形式发给
+  Worker（可能出现在它的请求日志里），所以请妥善保管房间链接。
 - **信令**（`apps/worker`）：Cloudflare Worker + Durable Object（`partyserver`），通过 WebSocket
   转发 WebRTC 的 offer / answer / ICE candidate。
 - **传输**（`apps/web`）：每个对端之间有一条 `control` 数据通道，用来传递 offer / 接受 / 取消和文本；

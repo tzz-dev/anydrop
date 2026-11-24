@@ -20,6 +20,8 @@ import ReceivedTexts, { type ReceivedTextView } from "@/components/ReceivedTexts
 import SendPanel from "@/components/SendPanel";
 import DeviceName from "@/components/DeviceName";
 import ConnectionStatus from "@/components/ConnectionStatus";
+import PrivateRoomPanel from "@/components/PrivateRoomPanel";
+import { generateRoomCode, getRoomCode, setRoomCode, subscribeRoomCode } from "@/lib/privateRoom";
 
 interface RawReceivedText {
   textId: string;
@@ -34,13 +36,20 @@ function getServerIdentitySnapshot(): Identity | null {
   return null;
 }
 
+function getServerRoomCodeSnapshot(): string | null {
+  return null;
+}
+
 export default function Page() {
   // sessionStorage isn't available during SSR, so the server snapshot is
   // null and the real identity appears once the client takes over.
   const identity = useSyncExternalStore(subscribeIdentity, getIdentity, getServerIdentitySnapshot);
   const { t } = useI18n();
 
-  const room = useRoom(identity);
+  // The private room code lives in the URL fragment; null means the shared
+  // room of this network.
+  const roomCode = useSyncExternalStore(subscribeRoomCode, getRoomCode, getServerRoomCodeSnapshot);
+  const room = useRoom(identity, roomCode);
   // The PeerManager callback is created once, so it reads the roster via a ref.
   const peersRef = useRef(room.peers);
   useEffect(() => {
@@ -343,10 +352,24 @@ export default function Page() {
       </header>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-black/60 dark:text-white/60">{t.sectionPeers}</h2>
-        <PeerList peers={room.peers} selectedConnectionId={effectiveSelectedConnectionId} onSelect={setSelectedConnectionId} />
-        <p className="text-xs text-black/40 dark:text-white/40">{t.peersNotice}</p>
+        <h2 className="text-sm font-medium text-black/60 dark:text-white/60">
+          {roomCode ? t.sectionPeersPrivate : t.sectionPeers}
+        </h2>
+        <PeerList
+          peers={room.peers}
+          selectedConnectionId={effectiveSelectedConnectionId}
+          onSelect={setSelectedConnectionId}
+          privateRoom={roomCode !== null}
+        />
+        <p className="text-xs text-black/40 dark:text-white/40">{roomCode ? t.peersNoticePrivate : t.peersNotice}</p>
       </section>
+
+      <PrivateRoomPanel
+        roomCode={roomCode}
+        onCreate={() => setRoomCode(generateRoomCode())}
+        onJoin={setRoomCode}
+        onLeave={() => setRoomCode(null)}
+      />
 
       <SendPanel
         peerName={selectedPeer?.displayName ?? null}

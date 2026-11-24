@@ -66,16 +66,43 @@ function normalizeIp(ip: string): string {
 
 export async function hashIpToRoomId(ip: string, salt: string): Promise<string> {
   const normalized = normalizeIp(ip || DEV_FALLBACK_IP);
-  const bytes = new TextEncoder().encode(`${salt}:${normalized}`);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return sha256Hex16(`${salt}:${normalized}`);
+}
+
+// Private rooms are joined with a secret code instead of a shared network.
+// Clients generate 8+ random characters; the strict format keeps junk (and
+// anything that could be confused with an IP-derived room) out.
+const ROOM_CODE_PATTERN = /^[A-Z0-9]{8,32}$/;
+
+export function isValidRoomCode(code: string): boolean {
+  return ROOM_CODE_PATTERN.test(code);
+}
+
+async function sha256Hex16(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(digest)]
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("")
     .slice(0, 16);
 }
 
-export async function verifyRoomId(ip: string, salt: string, roomId: string): Promise<boolean> {
-  return (await hashIpToRoomId(ip, salt)) === roomId;
+export async function hashRoomCode(code: string, salt: string): Promise<string> {
+  return sha256Hex16(`${salt}:code:${code}`);
+}
+
+// Picks the room for a connection: the private room named by `?room=CODE`, or
+// the network room derived from the caller's IP. A malformed code is an error
+// rather than a silent fallback, so nobody lands in the shared network room
+// believing they are in a private one.
+export async function resolveRoomId(request: Request, salt: string): Promise<string | null> {
+  const code = new URL(request.url).searchParams.get("room");
+  if (code === null) return hashIpToRoomId(clientIp(request), salt);
+  if (!isValidRoomCode(code)) return null;
+  return hashRoomCode(code, salt);
+}
+
+export async function verifyRoomId(request: Request, salt: string, roomId: string): Promise<boolean> {
+  return (await resolveRoomId(request, salt)) === roomId;
 }
 
 export function clientIp(request: Request): string {

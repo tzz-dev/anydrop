@@ -8,18 +8,20 @@ export default function PeerList({
   peers,
   selectedConnectionId,
   onSelect,
+  privateRoom = false,
 }: {
   peers: PeerInfo[];
   selectedConnectionId: string | null;
   onSelect: (connectionId: string) => void;
+  privateRoom?: boolean;
 }) {
   const { t } = useI18n();
 
   if (peers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-black/10 p-10 text-center text-sm text-black/50 dark:border-white/10 dark:text-white/50">
-        <p>{t.peersEmptyTitle}</p>
-        <p>{t.peersEmptyHint}</p>
+        <p>{privateRoom ? t.peersEmptyPrivateTitle : t.peersEmptyTitle}</p>
+        <p>{privateRoom ? t.peersEmptyPrivateHint : t.peersEmptyHint}</p>
       </div>
     );
   }

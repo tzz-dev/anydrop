@@ -3,7 +3,7 @@ import type { PeerInfo, ServerSignalMessage } from "@anydrop/protocol";
 import type { Env } from "./env";
 import { parseClientMessage } from "./messages";
 import { RateLimiter } from "./rate-limit";
-import { clientIp, verifyRoomId } from "./room-id";
+import { verifyRoomId } from "./room-id";
 
 interface PeerConnectionState {
   peerId: string;
@@ -39,9 +39,8 @@ export class AnydropRoom extends Server<Env> {
 
   async onConnect(connection: Connection<PeerConnectionState>, ctx: ConnectionContext) {
     // Defense in depth: reject anyone who connected straight to a guessed
-    // room id instead of going through the Worker's IP-based routing in index.ts.
-    const ip = clientIp(ctx.request);
-    const isExpectedRoom = await verifyRoomId(ip, this.env.ROOM_SALT, this.name);
+    // room id instead of going through the Worker's routing in index.ts.
+    const isExpectedRoom = await verifyRoomId(ctx.request, this.env.ROOM_SALT, this.name);
     if (!isExpectedRoom) {
       connection.close(4001, "room mismatch");
       return;

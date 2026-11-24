@@ -43,7 +43,9 @@ function parseServerMessage(raw: unknown): ServerSignalMessage | null {
   return null;
 }
 
-export function useRoom(identity: Identity | null): RoomHandle {
+// roomCode null joins the shared "nearby" room of this network; a code joins
+// that private room instead (and nothing else, so the device is invisible nearby).
+export function useRoom(identity: Identity | null, roomCode: string | null = null): RoomHandle {
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [peers, setPeers] = useState<PeerInfo[]>([]);
   const [status, setStatus] = useState<RoomStatus>("connecting");
@@ -66,7 +68,8 @@ export function useRoom(identity: Identity | null): RoomHandle {
       return;
     }
 
-    const socket = new ReconnectingWebSocket(`${SIGNAL_URL}/connect`);
+    const query = roomCode ? `?room=${encodeURIComponent(roomCode)}` : "";
+    const socket = new ReconnectingWebSocket(`${SIGNAL_URL}/connect${query}`);
     socketRef.current = socket;
 
     // The roster is intentionally kept while disconnected so the list doesn't
@@ -127,7 +130,7 @@ export function useRoom(identity: Identity | null): RoomHandle {
       setPeers([]);
       setStatus("connecting");
     };
-  }, [peerId]);
+  }, [peerId, roomCode]);
 
   // Tell the room about a new name (the server just updates our roster entry).
   useEffect(() => {

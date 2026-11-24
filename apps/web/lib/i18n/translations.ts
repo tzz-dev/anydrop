@@ -56,6 +56,22 @@ export interface Dictionary {
   textCopied: string;
   textDelete: string;
   transferRemaining: (time: string) => string;
+  sectionPeersPrivate: string;
+  peersEmptyPrivateTitle: string;
+  peersEmptyPrivateHint: string;
+  peersNoticePrivate: string;
+  privateTitle: string;
+  privateIntro: string;
+  privateCreate: string;
+  privateJoinLabel: string;
+  privateJoinPlaceholder: string;
+  privateJoin: string;
+  privateInvalidCode: string;
+  privateActiveIntro: string;
+  privateLinkLabel: string;
+  privateCopyLink: string;
+  privateQrLabel: string;
+  privateLeave: string;
 }
 
 export const dictionaries: Record<Locale, Dictionary> = {
@@ -112,6 +128,22 @@ export const dictionaries: Record<Locale, Dictionary> = {
     textCopied: "已复制",
     textDelete: "删除",
     transferRemaining: (time) => `剩余 ${time}`,
+    sectionPeersPrivate: "私密房间里的设备",
+    peersEmptyPrivateTitle: "房间里还没有其他设备",
+    peersEmptyPrivateHint: "把下面的链接或二维码发给想连接的设备,对方打开后会出现在这里",
+    peersNoticePrivate: "只有拿到房间链接的人才能加入。不要把它公开发布。",
+    privateTitle: "私密房间",
+    privateIntro: "创建私密房间后,只有拿到链接或二维码的设备才能加入,不在同一网络也可以。进入后你会从附近设备列表中隐身。",
+    privateCreate: "创建私密房间",
+    privateJoinLabel: "已有房间码?",
+    privateJoinPlaceholder: "输入房间码",
+    privateJoin: "加入",
+    privateInvalidCode: "房间码无效",
+    privateActiveIntro: "你已隐身:附近的陌生设备看不到你。把链接或二维码发给想连接的设备。",
+    privateLinkLabel: "房间链接",
+    privateCopyLink: "复制链接",
+    privateQrLabel: "房间链接二维码",
+    privateLeave: "离开私密房间",
   },
   en: {
     connecting: "Connecting…",
@@ -166,6 +198,22 @@ export const dictionaries: Record<Locale, Dictionary> = {
     textCopied: "Copied",
     textDelete: "Delete",
     transferRemaining: (time) => `${time} left`,
+    sectionPeersPrivate: "Devices in the private room",
+    peersEmptyPrivateTitle: "No other devices in this room yet",
+    peersEmptyPrivateHint: "Send the link or QR code below to the device you want to connect; it appears here once opened",
+    peersNoticePrivate: "Only people with the room link can join. Do not post it publicly.",
+    privateTitle: "Private room",
+    privateIntro: "In a private room only devices with the link or QR code can join, even on a different network. You also disappear from the nearby device list while inside.",
+    privateCreate: "Create a private room",
+    privateJoinLabel: "Have a room code?",
+    privateJoinPlaceholder: "Enter room code",
+    privateJoin: "Join",
+    privateInvalidCode: "Invalid room code",
+    privateActiveIntro: "You are hidden: strangers on your network cannot see you. Send the link or QR code to the devices you want to connect.",
+    privateLinkLabel: "Room link",
+    privateCopyLink: "Copy link",
+    privateQrLabel: "QR code for the room link",
+    privateLeave: "Leave private room",
   },
   ja: {
     connecting: "接続中…",
@@ -220,5 +268,21 @@ export const dictionaries: Record<Locale, Dictionary> = {
     textCopied: "コピーしました",
     textDelete: "削除",
     transferRemaining: (time) => `残り ${time}`,
+    sectionPeersPrivate: "プライベートルームのデバイス",
+    peersEmptyPrivateTitle: "このルームにはまだ他のデバイスがいません",
+    peersEmptyPrivateHint: "下のリンクか QR コードを接続したいデバイスに送ってください。開くとここに表示されます",
+    peersNoticePrivate: "ルームのリンクを知っている人だけが参加できます。公開しないでください。",
+    privateTitle: "プライベートルーム",
+    privateIntro: "プライベートルームには、リンクか QR コードを持つデバイスだけが参加でき、別のネットワークからでも接続できます。参加中は近くのデバイス一覧にも表示されません。",
+    privateCreate: "プライベートルームを作成",
+    privateJoinLabel: "ルームコードをお持ちですか？",
+    privateJoinPlaceholder: "ルームコードを入力",
+    privateJoin: "参加",
+    privateInvalidCode: "ルームコードが正しくありません",
+    privateActiveIntro: "非表示になっています。同じネットワークの見知らぬ人からは見えません。リンクか QR コードを接続したいデバイスに送ってください。",
+    privateLinkLabel: "ルームのリンク",
+    privateCopyLink: "リンクをコピー",
+    privateQrLabel: "ルームリンクの QR コード",
+    privateLeave: "プライベートルームを退出",
   },
 };

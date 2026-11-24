@@ -12,6 +12,11 @@ helps them find each other and set up the connection.
   (IPv6: the /64 prefix) with a secret salt to pick a Durable Object room, so devices behind
   the same router meet automatically. This is a heuristic: devices behind CGNAT, a corporate
   proxy or a VPN may share a room with strangers.
+- **Private rooms.** A device can instead create a private room: a random code (in the page
+  URL fragment, `#room=CODE`, which browsers never send to a server) that anyone with the link
+  or QR code can join from any network. Private-room devices are not in the nearby room, so
+  strangers on the same network cannot see them. The code is sent to the Worker as `?room=` when
+  connecting (and may appear in its request logs); keep room links private.
 - **Signaling** (`apps/worker`): Cloudflare Worker + Durable Object (`partyserver`) relaying
   WebRTC offers/answers/ICE candidates over WebSocket.
 - **Transfers** (`apps/web`): a per-peer `control` data channel carries offers/accept/cancel

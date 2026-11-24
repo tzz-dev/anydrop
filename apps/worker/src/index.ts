@@ -1,7 +1,7 @@
 import { getServerByName } from "partyserver";
 import type { Env } from "./env";
 import { isOriginAllowed } from "./origin";
-import { clientIp, hashIpToRoomId } from "./room-id";
+import { resolveRoomId } from "./room-id";
 
 export { AnydropRoom } from "./room";
 
@@ -23,10 +23,11 @@ export default {
       return new Response("Forbidden", { status: 403 });
     }
 
-    // Ignore any room name the client put in the URL — the room is always
-    // derived server-side from the caller's IP, so same-network devices are
-    // routed to the same Durable Object without a manual pairing step.
-    const roomId = await hashIpToRoomId(clientIp(request), env.ROOM_SALT);
+    // The room is always derived server-side: from the secret `?room=` code of
+    // a private room, or otherwise from the caller's IP, so same-network
+    // devices meet in the same Durable Object without any pairing step.
+    const roomId = await resolveRoomId(request, env.ROOM_SALT);
+    if (!roomId) return new Response("Invalid room code", { status: 400 });
     const stub = await getServerByName(env.ANYDROP_ROOM, roomId);
     return stub.fetch(request);
   },
