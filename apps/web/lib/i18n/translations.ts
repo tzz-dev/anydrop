@@ -72,6 +72,8 @@ export interface Dictionary {
   privateCopyLink: string;
   privateQrLabel: string;
   privateLeave: string;
+  faqTitle: string;
+  faq: { q: string; a: string }[];
 }
 
 export const dictionaries: Record<Locale, Dictionary> = {
@@ -144,6 +146,14 @@ export const dictionaries: Record<Locale, Dictionary> = {
     privateCopyLink: "复制链接",
     privateQrLabel: "房间链接二维码",
     privateLeave: "离开私密房间",
+    faqTitle: "隐私与常见问题",
+    faq: [
+      { q: "我的文件会被上传到服务器吗?", a: "不会。文件和文字通过浏览器之间的 WebRTC 直连传输,不经过也不存放在 AnyDrop 的服务器。服务器只负责中转建立连接所需的信息(设备名称和连接握手数据)。" },
+      { q: "谁能看到我的设备?", a: "默认情况下,使用同一公网 IP 的设备会互相看到,比如同一个 Wi-Fi。其他人看不到你。建立连接后,对方的浏览器会得知你的网络地址,这是 WebRTC 直连的固有特点。" },
+      { q: "私密房间安全吗?", a: "房间码是随机生成的,放在链接的 # 之后,浏览器不会把它发给网页服务器,但连接信令服务器时会作为参数发送,可能出现在其请求日志中。拿到链接或二维码的人都能进入房间,所以请只发给你信任的人。接收文件前仍需要你点击接受。" },
+      { q: "为什么连不上或传输失败?", a: "AnyDrop 只用公共 STUN 服务器,没有中继服务器。在公司网络、部分 VPN 或严格的 NAT 后面,两台设备可能无法直连。换到同一个 Wi-Fi 或关闭 VPN 通常能解决。" },
+      { q: "会保存我的数据吗?", a: "不会。收到的文字只保存在当前页面里,刷新或关闭后就没有了。浏览器只在本地记住你的设备名称。" },
+    ],
   },
   en: {
     connecting: "Connecting…",
@@ -214,6 +224,14 @@ export const dictionaries: Record<Locale, Dictionary> = {
     privateCopyLink: "Copy link",
     privateQrLabel: "QR code for the room link",
     privateLeave: "Leave private room",
+    faqTitle: "Privacy & FAQ",
+    faq: [
+      { q: "Are my files uploaded to a server?", a: "No. Files and text travel directly between browsers over WebRTC and never pass through or get stored on AnyDrop's servers. The server only relays what is needed to set up the connection: device names and the connection handshake." },
+      { q: "Who can see my device?", a: "By default, devices that share your public IP address see each other, for example on the same Wi-Fi. Other people cannot see you. Once connected, the other browser learns your network address, as with any direct WebRTC connection." },
+      { q: "Are private rooms secure?", a: "The room code is random and lives after the # in the link, which browsers do not send to the web server. It is sent to the signaling server when connecting, so it may appear in that server's request logs. Anyone with the link or QR code can join, so share it only with people you trust. You still have to accept every incoming file." },
+      { q: "Why can't I connect, or why did a transfer fail?", a: "AnyDrop uses only a public STUN server and has no relay. Behind some corporate networks, VPNs or strict NATs, two devices cannot reach each other directly. Joining the same Wi-Fi or turning off the VPN usually fixes it." },
+      { q: "Is my data stored?", a: "No. Received text lives only in the open page and disappears when you reload or close it. The browser remembers only your device name, locally." },
+    ],
   },
   ja: {
     connecting: "接続中…",
@@ -284,5 +302,13 @@ export const dictionaries: Record<Locale, Dictionary> = {
     privateCopyLink: "リンクをコピー",
     privateQrLabel: "ルームリンクの QR コード",
     privateLeave: "プライベートルームを退出",
+    faqTitle: "プライバシーとよくある質問",
+    faq: [
+      { q: "ファイルはサーバーにアップロードされますか?", a: "いいえ。ファイルとテキストは WebRTC でブラウザ同士が直接やり取りし、AnyDrop のサーバーを経由せず、保存もされません。サーバーが中継するのは、接続の確立に必要な情報(デバイス名と接続のやり取り)だけです。" },
+      { q: "誰に自分のデバイスが見えますか?", a: "既定では、同じグローバル IP を使うデバイス(同じ Wi-Fi など)同士が見えます。それ以外の人には見えません。接続すると、相手のブラウザにあなたのネットワークアドレスが伝わります。これは WebRTC の直接接続に共通の性質です。" },
+      { q: "プライベートルームは安全ですか?", a: "ルームコードはランダムに生成され、リンクの # 以降に入るため、ブラウザは Web サーバーに送信しません。ただし接続時にシグナリングサーバーへ送られるため、そのリクエストログに残る可能性があります。リンクか QR コードを持つ人は誰でも参加できるので、信頼できる相手にだけ共有してください。ファイルの受信は毎回承認が必要です。" },
+      { q: "接続できない、または転送に失敗するのはなぜですか?", a: "AnyDrop は公開の STUN サーバーのみを使い、中継サーバーはありません。社内ネットワーク、一部の VPN、厳しい NAT の内側では、直接つながらないことがあります。同じ Wi-Fi に接続するか、VPN を切ると解決することが多いです。" },
+      { q: "データは保存されますか?", a: "いいえ。受け取ったテキストは開いているページ内にだけあり、再読み込みや閉じると消えます。ブラウザに残るのはデバイス名だけで、端末内に保存されます。" },
+    ],
   },
 };

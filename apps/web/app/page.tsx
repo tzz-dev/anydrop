@@ -17,6 +17,7 @@ import IncomingTransferDialog, { type IncomingOffer } from "@/components/Incomin
 import TransferProgress, { type TransferView } from "@/components/TransferProgress";
 import TextSharePanel, { type StagedText } from "@/components/TextSharePanel";
 import ReceivedTexts, { type ReceivedTextView } from "@/components/ReceivedTexts";
+import Faq from "@/components/Faq";
 import SendPanel, { type SendTab } from "@/components/SendPanel";
 import DeviceName from "@/components/DeviceName";
 import ConnectionStatus from "@/components/ConnectionStatus";
@@ -413,6 +414,8 @@ export default function Page() {
           <TransferProgress transfers={transferList} onCancel={handleCancelTransfer} />
         </section>
       )}
+
+      <Faq />
 
       {pageDragging && (
         <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center border-4 border-dashed border-blue-500/60 bg-blue-500/10">
