@@ -18,6 +18,14 @@
       }
     ]
   },
+  // Private-room join attempts: 20 per minute per client network (see join-limit.ts).
+  "ratelimits": [
+    {
+      "name": "JOIN_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 20, "period": 60 }
+    }
+  ],
   "migrations": [
     {
       "tag": "v1",

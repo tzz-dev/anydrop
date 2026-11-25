@@ -46,7 +46,7 @@ function expandIPv6(ip: string): number[] | null {
 // each device can get its own public address — so we use the /64 prefix as
 // an approximate LAN-sized group. IPv4-mapped IPv6 addresses collapse to
 // their IPv4 form. This is a heuristic, not exact.
-function normalizeIp(ip: string): string {
+export function normalizeIp(ip: string): string {
   if (!ip.includes(":")) return ip;
 
   const groups = expandIPv6(ip);

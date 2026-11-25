@@ -1,5 +1,6 @@
 import { getServerByName } from "partyserver";
 import type { Env } from "./env";
+import { allowJoin } from "./join-limit";
 import { isOriginAllowed } from "./origin";
 import { resolveRoomId } from "./room-id";
 
@@ -21,6 +22,11 @@ export default {
 
     if (!isOriginAllowed(request.headers.get("Origin"), env.ALLOWED_ORIGINS)) {
       return new Response("Forbidden", { status: 403 });
+    }
+
+    // Slow down anyone trying many room codes (a code is the only secret).
+    if (!(await allowJoin(request, env.JOIN_LIMITER))) {
+      return new Response("Too many attempts", { status: 429, headers: { "Retry-After": "60" } });
     }
 
     // The room is always derived server-side: from the secret `?room=` code of
